@@ -1,0 +1,65 @@
+/* Design tokens: "Accessible & Ethical" government style (ui-ux-pro-max design system, design-system/jansetu/MASTER.md) */
+:root {
+  --color-primary: #0f172a;
+  --color-on-primary: #ffffff;
+  --color-secondary: #334155;
+  --color-accent: #0369a1;
+  --color-accent-hover: #075985;
+  --color-accent-soft: #e0f2fe;
+  --color-on-accent: #ffffff;
+  --color-background: #f8fafc;
+  --color-foreground: #020617;
+  --color-card: #ffffff;
+  --color-muted: #e8ecf1;
+  --color-muted-foreground: #475569;
+  --color-border: #e2e8f0;
+  --color-border-strong: #cbd5e1;
+  --color-destructive: #dc2626;
+  --color-success: #15803d;
+  --color-success-soft: #dcfce7;
+  --color-warning: #b45309;
+  --color-warning-soft: #fef3c7;
+  --color-danger-soft: #fee2e2;
+  --color-silent: #6d28d9;
+  --color-silent-soft: #ede9fe;
+  --color-ring: #0369a1;
+
+  /* sector palette (always paired with an icon + label; never colour alone) */
+  --sector-water: #2a78d6;
+  --sector-roads: #eb6834;
+  --sector-sanitation: #1baf7a;
+  --sector-electricity: #eda100;
+  --sector-health: #e87ba4;
+  --sector-education: #4a3aa7;
+  --sector-other: #475569;
+
+  /* Need-Gap sequential scale */
+  --ngi-1: #fef3c7;
+  --ngi-2: #fcd34d;
+  --ngi-3: #f59e0b;
+  --ngi-4: #dc2626;
+  --ngi-5: #7f1d1d;
+
+  --space-xs: 4px;
+  --space-sm: 8px;
+  --space-md: 16px;
+  --space-lg: 24px;
+  --space-xl: 32px;
+  --space-2xl: 48px;
+
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 14px;
+
+  --shadow-sm: 0 1px 2px rgba(15, 23, 42, 0.06);
+  --shadow-md: 0 4px 12px rgba(15, 23, 42, 0.08);
+  --shadow-lg: 0 12px 28px rgba(15, 23, 42, 0.14);
+
+  --font-body: 'Fira Sans', 'Noto Sans Devanagari', 'Noto Sans Telugu', 'Noto Sans Oriya', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-mono: 'Fira Code', ui-monospace, SFMono-Regular, Menlo, monospace;
+
+  --ease: cubic-bezier(0.2, 0, 0, 1);
+  --dur-fast: 150ms;
+  --dur: 220ms;
+  --sidebar-w: 248px;
+}

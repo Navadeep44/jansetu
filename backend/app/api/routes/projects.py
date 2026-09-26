@@ -1,0 +1,106 @@
+"""AI-recommended projects + existing investment plans. AI recommends; humans decide (audited),
+and every citizen in the underlying demand cluster is notified in their own language."""
+from datetime import datetime
+
+from fastapi import APIRouter, Depends, HTTPException
+from sqlalchemy.orm import Session
+
+from app.core.database import get_db
+from app.core.i18n import t
+from app.core.security import PLANNER_ROLES, require
+from app.models import AuditLog, CitizenRequest, DemandCluster, Project
+from app.schemas.inputs import DecisionIn, OptimiseIn
+from app.schemas.serializers import project_out
+from app.services import analytics_cache, pipeline, recommender
+
+router = APIRouter(prefix="/projects", tags=["projects"])
+TRANSITIONS = {"approve": "approved", "defer": "deferred", "reject": "rejected", "start": "in_progress", "complete": "completed"}
+
+
+@router.get("")
+def list_projects(source: str | None = None, country: str | None = None, status: str | None = None, sector: str | None = None,
+                  limit: int = 100, db: Session = Depends(get_db)):
+    q = db.query(Project)
+    if source:
+        q = q.filter(Project.source == source)
+    if country:
+        q = q.filter(Project.country_code == country)
+    if status:
+        q = q.filter(Project.status.in_(status.split(",")))
+    if sector:
+        q = q.filter(Project.sector == sector)
+    return [project_out(p) for p in q.order_by(Project.score.desc(), Project.cost_usd.desc()).limit(limit).all()]
+
+
+@router.get("/{project_id}")
+def detail(project_id: int, db: Session = Depends(get_db)):
+    p = db.get(Project, project_id)
+    if not p:
+        raise HTTPException(404)
+    out = project_out(p)
+    out["explanation"] = recommender.explain(db, p) if p.source == "recommended" else None
+    if p.cluster_id:
+        c = db.get(DemandCluster, p.cluster_id)
+        out["cluster"] = {"id": c.id, "title": c.title, "unique_households": c.unique_households,
+                          "languages": c.languages, "request_count": c.request_count} if c else None
+    return out
+
+
+@router.post("/regenerate")
+def regenerate(min_ngi: float = 40.0, role: str = Depends(require(*PLANNER_ROLES)), db: Session = Depends(get_db)):
+    n = recommender.regenerate(db, min_ngi=min_ngi)
+    db.add(AuditLog(actor_role=role, action="regenerate_recommendations", entity="project", entity_id="*", detail={"created": n}))
+    db.commit()
+    return {"created": n}
+
+
+@router.post("/{project_id}/decision")
+def decide(project_id: int, body: DecisionIn, role: str = Depends(require(*PLANNER_ROLES)), db: Session = Depends(get_db)):
+    p = db.get(Project, project_id)
+    if not p:
+        raise HTTPException(404)
+    if body.decision not in TRANSITIONS:
+        raise HTTPException(400, f"decision must be one of {list(TRANSITIONS)}")
+    if body.decision in ("reject", "defer") and len(body.reason.strip()) < 5:
+        raise HTTPException(422, "A reason is required to reject or defer an AI recommendation (accountability).")
+    p.status, p.decision_reason, p.decided_by = TRANSITIONS[body.decision], body.reason, role
+    now = datetime.utcnow()
+    if body.decision == "start":
+        p.started_at = now
+    if body.decision == "complete":
+        p.completed_at = now
+    notified = 0
+    if p.cluster_id and body.decision in ("approve", "start", "complete"):
+        reqs = db.query(CitizenRequest).filter(CitizenRequest.cluster_id == p.cluster_id,
+                                               CitizenRequest.status.notin_(["closed"])).all()
+        for r in reqs:
+            if body.decision == "approve":
+                r.status, kind, msg = "in_plan", "approved", t("approved", r.language, project=p.title)
+            elif body.decision == "start":
+                r.status, kind, msg = "in_progress", "approved", t("approved", r.language, project=p.title)
+            else:
+                r.status, kind, msg = "resolved_pending_verification", "resolved", t("resolved", r.language, tid=r.tracking_id)
+                r.closure_note = f"Project {p.code} completed: {p.title}."
+                r.closed_at = now
+            pipeline.notify(db, r, kind, msg)
+            notified += 1
+        c = db.get(DemandCluster, p.cluster_id)
+        if c:
+            c.status = {"approve": "in_plan", "start": "in_progress", "complete": "resolved"}[body.decision]
+    db.add(AuditLog(actor_role=role, action=f"project_{body.decision}", entity="project", entity_id=p.code,
+                    detail={"reason": body.reason, "score": p.score, "citizens_notified": notified}))
+    db.commit()
+    analytics_cache.bump()
+    return {"project": project_out(p), "citizens_notified": notified}
+
+
+@router.post("/optimise")
+def optimise(body: OptimiseIn, db: Session = Depends(get_db)):
+    statuses = ["recommended", "approved"] if body.include_approved else ["recommended"]
+    cands = db.query(Project).filter(Project.source == "recommended", Project.country_code == body.country,
+                                     Project.status.in_(statuses)).all()
+    res = recommender.optimise(cands, body.budget)
+    res["projects"] = [project_out(p) for p in cands if p.id in set(res["selected"])]
+    res["candidates"] = len(cands)
+    res["candidate_total_cost"] = sum(p.cost_local for p in cands)
+    return res

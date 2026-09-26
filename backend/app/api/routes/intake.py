@@ -1,0 +1,78 @@
+"""Citizen intake: web/PWA, assisted (CSC / ASHA / community worker), community meetings, voice."""
+import uuid
+from pathlib import Path
+
+from fastapi import APIRouter, Depends, File, Form, UploadFile
+from sqlalchemy.orm import Session
+
+from app.core.database import get_db
+from app.schemas.inputs import CommunityIntake, PreviewIn, TextIntake
+from app.schemas.serializers import cluster_out, request_out
+from app.services import pipeline
+from app.services.ai import speech
+from app.services.ai.extraction import extract
+
+router = APIRouter(prefix="/intake", tags=["intake"])
+MEDIA = Path("media")
+
+
+def _result(res: dict) -> dict:
+    return {"tracking_id": res["request"].tracking_id, "reply": res["reply"], "reply_kind": res["reply_kind"],
+            "request": request_out(res["request"]), "cluster": cluster_out(res["cluster"]) if res["cluster"] else None,
+            "understanding": res["understanding"]}
+
+
+@router.post("/preview")
+def preview(body: PreviewIn):
+    """Live 'what the AI understood' while the citizen types or speaks (nothing is stored)."""
+    return extract(body.text, body.language)
+
+
+@router.post("/text")
+def intake_text(body: TextIntake, db: Session = Depends(get_db)):
+    res = pipeline.process(db, text=body.text, channel=body.channel, lang_hint=body.language, lat=body.lat, lng=body.lng,
+                           location_text=body.location_text, identifier=body.phone, anonymous=body.anonymous,
+                           gender=body.gender, assisted_by=body.assisted_by, area_id=body.area_id, country_hint=body.country)
+    return _result(res)
+
+
+@router.post("/form")
+async def intake_form(
+    text: str = Form(""), language: str | None = Form(None), channel: str = Form("web"),
+    lat: float | None = Form(None), lng: float | None = Form(None), location_text: str = Form(""),
+    area_id: int | None = Form(None), phone: str | None = Form(None), anonymous: bool = Form(False),
+    gender: str = Form("undisclosed"), assisted_by: str | None = Form(None),
+    audio: UploadFile | None = File(None), photo: UploadFile | None = File(None), db: Session = Depends(get_db),
+):
+    """Multipart intake with optional voice recording and photo evidence."""
+    MEDIA.mkdir(exist_ok=True)
+    audio_path = photo_path = None
+    asr_mode = "browser" if text else "none"
+    if audio is not None:
+        data = await audio.read()
+        ext = (audio.filename or "voice.webm").rsplit(".", 1)[-1]
+        audio_path = str(MEDIA / f"{uuid.uuid4().hex}.{ext}")
+        Path(audio_path).write_bytes(data)
+        if not text:
+            transcript, asr_mode = speech.transcribe(data, audio.filename or "voice.webm", language)
+            text = transcript or ""
+    if photo is not None:
+        ext = (photo.filename or "photo.jpg").rsplit(".", 1)[-1]
+        photo_path = str(MEDIA / f"{uuid.uuid4().hex}.{ext}")
+        Path(photo_path).write_bytes(await photo.read())
+    if not text:
+        text = "[voice message awaiting transcription]"
+    res = pipeline.process(db, text=text, channel=channel, lang_hint=language, lat=lat, lng=lng, location_text=location_text,
+                           identifier=phone, anonymous=anonymous, gender=gender, assisted_by=assisted_by, area_id=area_id,
+                           audio_path=audio_path, photo_path=photo_path)
+    out = _result(res)
+    out["asr_mode"] = asr_mode
+    return out
+
+
+@router.post("/community")
+def intake_community(body: CommunityIntake, db: Session = Depends(get_db)):
+    """Gram Sabha / ward meeting: one transcript -> many collective demands with supporter counts."""
+    results = pipeline.process_community(db, transcript=body.transcript, area_id=body.area_id, facilitator=body.facilitator,
+                                         lang_hint=body.language, default_supporters=body.default_supporters)
+    return {"count": len(results), "demands": [_result(r) for r in results]}

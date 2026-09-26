@@ -1,0 +1,11 @@
+# One command demo:  docker compose up --build   ->  http://localhost:8000
+services:
+  jansetu:
+    build: .
+    ports: ["8000:8000"]
+    env_file:
+      - path: backend/.env
+        required: false
+    volumes: ["jansetu-data:/data"]
+volumes:
+  jansetu-data:
