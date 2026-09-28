@@ -3,23 +3,26 @@ Script-based for Indic / Cyrillic / CJK / Arabic / Ethiopic, keyword-based for L
 import re
 
 LANGUAGES = {
-    "en": "English", "hi": "Hindi", "bho": "Bhojpuri", "te": "Telugu", "or": "Odia", "ta": "Tamil",
-    "bn": "Bengali", "mr": "Marathi", "pt": "Portuguese", "zu": "isiZulu", "xh": "isiXhosa",
-    "af": "Afrikaans", "ru": "Russian", "zh": "Chinese", "ar": "Arabic", "am": "Amharic",
-    "fa": "Persian", "id": "Indonesian", "gon": "Gondi",
+    "en": "English", "hi": "Hindi", "te": "Telugu", "ta": "Tamil", "bn": "Bengali",
+    "mr": "Marathi", "gu": "Gujarati", "kn": "Kannada", "ml": "Malayalam", "pa": "Punjabi",
+    "or": "Odia", "bho": "Bhojpuri", "gon": "Gondi",
+    # Legacy fallbacks for partner data compatibility
+    "pt": "Portuguese", "zu": "isiZulu", "xh": "isiXhosa", "af": "Afrikaans", "ru": "Russian", "zh": "Chinese", "ar": "Arabic", "am": "Amharic", "fa": "Persian", "id": "Indonesian",
 }
 
 # BCP-47 tags used by browser speech APIs / TTS
 SPEECH_TAGS = {
-    "en": "en-IN", "hi": "hi-IN", "bho": "hi-IN", "te": "te-IN", "or": "or-IN", "ta": "ta-IN", "bn": "bn-IN",
-    "mr": "mr-IN", "pt": "pt-BR", "zu": "zu-ZA", "xh": "xh-ZA", "af": "af-ZA", "ru": "ru-RU", "zh": "zh-CN",
-    "ar": "ar-EG", "am": "am-ET", "fa": "fa-IR", "id": "id-ID",
+    "en": "en-IN", "hi": "hi-IN", "bho": "hi-IN", "te": "te-IN", "ta": "ta-IN", "bn": "bn-IN",
+    "mr": "mr-IN", "gu": "gu-IN", "kn": "kn-IN", "ml": "ml-IN", "pa": "pa-IN", "or": "or-IN", "gon": "hi-IN",
+    # Fallbacks
+    "pt": "pt-BR", "zu": "zu-ZA", "xh": "xh-ZA", "af": "af-ZA", "ru": "ru-RU", "zh": "zh-CN", "ar": "ar-EG", "am": "am-ET", "fa": "fa-IR", "id": "id-ID",
 }
 
 _SCRIPT_RANGES = [
-    ("te", r"[ఀ-౿]"), ("or", r"[଀-୿]"), ("ta", r"[஀-௿]"),
-    ("bn", r"[ঀ-৿]"), ("hi", r"[ऀ-ॿ]"), ("ru", r"[Ѐ-ӿ]"),
-    ("zh", r"[一-鿿]"), ("am", r"[ሀ-፿]"), ("ar", r"[؀-ۿ]"),
+    ("te", r"[ఀ-౿]"), ("ta", r"[஀-௿]"), ("bn", r"[ঀ-৿]"),
+    ("or", r"[଀-୿]"), ("gu", r"[઀-૿]"), ("kn", r"[ಀ-೿]"),
+    ("ml", r"[ഀ-ൿ]"), ("pa", r"[਀-੿]"), ("hi", r"[ऀ-ॿ]"),
+    ("ru", r"[Ѐ-ӿ]"), ("zh", r"[一-鿿]"), ("am", r"[ሀ-፿]"), ("ar", r"[؀-ۿ]"),
 ]
 
 _LATIN_MARKERS = {

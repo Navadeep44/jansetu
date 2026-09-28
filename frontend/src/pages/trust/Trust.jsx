@@ -26,7 +26,7 @@ export function Audit() {
         {loading ? <Loading /> : (
           <div className="table-wrap"><table className="table">
             <thead><tr><th>When</th><th>Role</th><th>Action</th><th>Entity</th><th>Detail</th></tr></thead>
-            <tbody>{data.map((a) => (
+            <tbody>{(data || []).map((a) => (
               <tr key={a.id}><td className="xs">{date(a.at)}</td><td><Badge>{a.actor_role}</Badge></td><td>{a.action.replace(/_/g, ' ')}</td>
                 <td className="mono xs">{a.entity} {a.entity_id}</td><td className="xs" style={{ maxWidth: 420 }}>{a.detail?.reason || a.detail?.note || JSON.stringify(a.detail).slice(0, 160)}</td></tr>))}</tbody>
           </table></div>

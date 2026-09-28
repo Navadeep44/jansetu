@@ -55,6 +55,11 @@ AREAS = [
     ("IN", "Delhi", "East Delhi", "Trilokpuri", ["त्रिलोकपुरी"], "ward", "urban", 28.612, 77.310, 160000, 33000, 0.58, 0.72, 0.85, _i(.60, .64, .87, .60, .58, .45), ["hi"]),
     ("IN", "Delhi", "South West Delhi", "Vasant Vihar", ["वसंत विहार"], "ward", "urban", 28.560, 77.160, 60000, 15000, 0.10, 0.97, 0.95, _i(.92, .90, .97, .92, .93, .90), ["en", "hi"]),
     ("IN", "Delhi", "South Delhi", "Greater Kailash", ["ग्रेटर कैलाश", "GK"], "ward", "urban", 28.540, 77.240, 90000, 22000, 0.12, 0.96, 0.95, _i(.90, .90, .96, .92, .92, .88), ["en", "hi"]),
+    # ---------------- India: Maharashtra, Pune (urban + peri-urban; Marathi + Hindi) ----------------
+    ("IN", "Maharashtra", "Pune", "Haveli", ["हवेली", "Haveli"], "block", "peri-urban", 18.520, 73.856, 320000, 75000, 0.38, 0.78, 0.82, _i(.75, .78, .88, .75, .80, .70), ["mr", "hi", "en"]),
+    ("IN", "Maharashtra", "Pune", "Baramati", ["बारामती", "Baramati"], "block", "rural", 18.150, 74.580, 180000, 42000, 0.45, 0.70, 0.75, _i(.70, .72, .85, .68, .72, .65), ["mr", "hi"]),
+    # ---------------- India: Karnataka, Bengaluru Urban (Kannada + English) ----------------
+    ("IN", "Karnataka", "Bengaluru Urban", "Anekal", ["ಆನೇಕಲ್", "Anekal"], "block", "peri-urban", 12.710, 77.696, 290000, 68000, 0.40, 0.75, 0.80, _i(.72, .75, .86, .72, .76, .68), ["kn", "en", "hi"]),
     # ---------------- Brazil: São Paulo (subprefeituras / distritos) ----------------
     ("BR", "São Paulo", "São Paulo", "Capão Redondo", ["Capao Redondo"], "district", "urban", -23.670, -46.780, 285000, 90000, 0.66, 0.72, 0.70, _i(.78, .55, .85, .48, .45, .60), ["pt"]),
     ("BR", "São Paulo", "São Paulo", "Grajaú", ["Grajau"], "district", "urban", -23.785, -46.670, 385000, 118000, 0.72, 0.65, 0.65, _i(.60, .45, .82, .42, .40, .38), ["pt"]),

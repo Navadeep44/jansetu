@@ -20,28 +20,7 @@ from app.services import analytics_cache, clustering, pipeline, privacy, scoring
 from app.services.ai.lexicon import sector_sdg
 from app.services.geo import gazetteer
 
-router = APIRouter(tags=["public & auth"])
-
-
-class LoginIn(BaseModel):
-    username: str
-    password: str
-
-
-@router.post("/auth/login")
-def login(body: LoginIn):
-    return security.login(body.username, body.password)
-
-
-@router.get("/auth/me")
-def me(role: str = Depends(security.current_role)):
-    return {"role": role, "logged_in": role != "citizen"}
-
-
-@router.get("/auth/demo-accounts")
-def demo_accounts():
-    return [{"username": k, "password": v["password"], "role": v["role"], "name": v["name"], "title": v["title"]}
-            for k, v in security.DEMO_USERS.items()]
+router = APIRouter(tags=["public"])
 
 
 @router.get("/citizen/requests")
@@ -90,7 +69,7 @@ def support(cluster_id: int, body: SupportIn, db: Session = Depends(get_db)):
         translation_mode="source", country_code=c.country_code, area_id=c.area_id, lat=c.area.lat, lng=c.area.lng,
         category=c.category, subcategory=c.subcategory, severity=max(1, round(c.severity_avg)), sdg=sector_sdg(c.category),
         confidence=1.0, extraction_mode="support", household_hash=hh, status="clustered", cluster_id=c.id,
-        created_at=datetime.utcnow(), updated_at=datetime.utcnow(),
+        proof_count=0, created_at=datetime.utcnow(), updated_at=datetime.utcnow(),
     )
     r.area = c.area
     db.add(r)

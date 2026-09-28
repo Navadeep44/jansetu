@@ -1,20 +1,23 @@
 import { useEffect, useRef, useState } from 'react'
 import { MapPin, Phone, Send } from 'lucide-react'
 import { api } from '../../api/client'
+import { useApp } from '../../context/AppContext'
 import { Badge, Card, PageHead, SectorTag, Seg } from '../../components/ui'
 import { LANG_NAMES, pct } from '../../lib/format'
 
 const SCRIPTS = [
-  { label: 'Telugu voice note, no place', msgs: ['మా ఊరిలో తాగునీరు లేదు, బోరు పాడైపోయింది. పిల్లలకు నీళ్ళు లేవు.', 'జైనూర్'] },
-  { label: 'Bhojpuri, Delhi', msgs: ['हमनी के गली में नाली उफना जाला, सीवर के पानी से लइकन बेमार हो जात बाड़न। Seelampur'] },
-  { label: 'Portuguese, São Paulo', msgs: ['Poste de luz queimado há dois meses em Capão Redondo, a rua fica escura e perigosa.'] },
-  { label: 'isiZulu, Soweto', msgs: ['Awukho ugesi kusukela izolo eSoweto, i-load shedding ayipheli.'] },
-  { label: 'Russian (partner node)', msgs: ['Нет воды уже три дня, дети без питьевой воды. Utnoor'] },
-  { label: 'Check status', msgs: ['status JS-IN-LAKSH1'] },
+  { label: 'Telugu voice note: no drinking water, Jainoor', msgs: ['మా ఊరిలో తాగునీరు లేదు, బోరు పాడైపోయింది. పిల్లలకు నీళ్ళు లేవు.', 'జైనూర్'] },
+  { label: 'Hindi voice note: road washed away, Bawana', msgs: ['गाँव तक पक्की सड़क नहीं है, बारिश में एम्बुलेंस नहीं आ पाती। Bawana'] },
+  { label: 'Tamil: broken tap, Utnoor', msgs: ['எங்கள் கிராமத்தில் குடிநீர் குழாய் உடைந்துவிட்டது, தண்ணீர் வரவில்லை. Utnoor'] },
+  { label: 'Bengali: no roads in monsoon, Koraput', msgs: ['আমাদের গ্রামে কোনো পাকা রাস্তা নেই, বর্ষায় যোগাযোগ বিচ্ছিন্ন হয়ে যায়। Koraput'] },
+  { label: 'Bhojpuri: overflowing drain, Seelampur', msgs: ['हमनी के गली में नाली उफना जाला, सीवर के पानी से लइकन बेमार हो जात बाड़न। Seelampur'] },
+  { label: 'Marathi: power cut for 4 days, Utnoor', msgs: ['गावात चार दिवसांपासून वीज नाही, ट्रान्सफॉर्मर जळाला आहे. Utnoor'] },
+  { label: 'Check status by tracking ID', msgs: ['status JS-IN-LAKSH1'] },
 ]
 const HEADS = { whatsapp: 'WhatsApp · JanSetu', telegram: 'Telegram · @JanSetuBot', sms: 'SMS · 1800-JANSETU', ivr: 'IVR call · 1800-JANSETU' }
 
 export default function Channels() {
+  const { t } = useApp()
   const [channel, setChannel] = useState('whatsapp')
   const [sender] = useState(() => '+91' + Math.floor(7000000000 + Math.random() * 999999999))
   const [msgs, setMsgs] = useState([{ from: 'bot', text: 'Namaste! This is JanSetu. Tell us, by voice or text in your own language, what your area needs.' }])
@@ -35,8 +38,8 @@ export default function Channels() {
 
   return (
     <div className="stack-md">
-      <PageHead title="WhatsApp & phone demo">
-        Chat exactly like a citizen would. Real WhatsApp, Telegram, phone calls and SMS use the same engine.
+      <PageHead title={t('channels_title', 'WhatsApp & phone demo')}>
+        {t('channels_subtitle', 'Chat exactly like a citizen would. Real WhatsApp, Telegram, phone calls and SMS use the same engine.')}
       </PageHead>
       <div className="grid g-main" style={{ alignItems: 'start' }}>
         <div className="row" style={{ alignItems: 'flex-start', gap: 24 }}>

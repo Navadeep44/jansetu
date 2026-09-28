@@ -12,13 +12,10 @@ from app.seed.seed import run as seed  # noqa: E402
 GOV = {}  # filled after login
 
 
-@pytest.fixture(scope="session")
-def client():
-    seed()
-    with TestClient(app) as c:
-        tok = c.post("/api/auth/login", json={"username": "planner", "password": "planner123"}).json()["token"]
-        GOV["Authorization"] = f"Bearer {tok}"
-        yield c
+@pytest.fixture(scope="session", autouse=True)
+def setup_gov_auth(client):
+    tok = client.post("/api/auth/login", json={"username": "planner", "password": "planner123"}).json()["token"]
+    GOV["Authorization"] = f"Bearer {tok}"
 
 
 def test_health_and_meta(client):

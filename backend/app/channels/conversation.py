@@ -72,7 +72,7 @@ def handle(db: Session, *, channel: str, sender: str, text: str = "", lang_hint:
         if req:
             return {"reply": verify(db, req, word in YES_WORDS), "kind": "verification", "tracking_id": req.tracking_id}
 
-    pending = _latest_for(db, sender_hash, ("needs_review",))
+    pending = _latest_for(db, sender_hash, ("needs_review", "received"))
     if pending and "needs_location" in (pending.flags or []):
         area = None
         if lat is not None and lng is not None:

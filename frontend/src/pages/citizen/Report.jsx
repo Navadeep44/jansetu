@@ -9,7 +9,7 @@ import ReplyBox from '../../components/citizen/ReplyBox'
 import { Badge, Card, ErrorBox, SectorTag, Tabs } from '../../components/ui'
 import { LANG_NAMES, pct } from '../../lib/format'
 
-const SPEAK_LANGS = ['te', 'hi', 'or', 'bn', 'ta', 'en', 'pt', 'zu', 'xh', 'af', 'ru', 'zh', 'ar']
+const SPEAK_LANGS = ['en', 'hi', 'te', 'ta', 'bn', 'mr', 'gu', 'kn', 'ml', 'pa', 'or', 'bho']
 
 function Understanding({ u }) {
   if (!u) return null
@@ -28,11 +28,11 @@ function Understanding({ u }) {
 }
 
 export default function Report() {
-  const { uiLang } = useApp()
-  const L = (k) => tr(uiLang, k)
+  const { uiLang, t } = useApp()
+  const L = (k) => t(k, tr(uiLang, k))
   const [tab, setTab] = useState('individual')
   const [text, setText] = useState('')
-  const [speakLang, setSpeakLang] = useState(uiLang === 'en' ? 'te' : uiLang)
+  const [speakLang, setSpeakLang] = useState(uiLang)
   const [audio, setAudio] = useState(null)
   const [photo, setPhoto] = useState(null)
   const [coords, setCoords] = useState(null)
@@ -80,7 +80,7 @@ export default function Report() {
     try { const r = await api.support(c.id, phone, uiLang); setSupported((s) => ({ ...s, [c.id]: r })) } catch (e) { setError(e) }
   }
 
-  useEffect(() => { if (uiLang !== 'en') setSpeakLang(uiLang) }, [uiLang])
+  useEffect(() => { setSpeakLang(uiLang) }, [uiLang])
   useEffect(() => { api.areas().then((res) => setAreas(Array.isArray(res) ? res : [])).catch(() => setAreas([])) }, [])
   useEffect(() => {
     if (text.trim().length < 8) { setPreview(null); return }
@@ -275,9 +275,10 @@ export default function Report() {
                 {[
                   'మా ఊరిలో తాగునీరు లేదు, బోరు పాడైపోయింది. నార్నూర్',
                   'गाँव तक पक्की सड़क नहीं है, बारिश में एम्बुलेंस नहीं आ पाती। Bawana',
-                  'Esgoto a céu aberto na frente das casas em Grajaú, as crianças estão doentes',
-                  'Awukho ugesi kusukela izolo eSoweto, i-load shedding ayipheli',
-                  'Gas leak near the school in Tembisa, children trapped!',
+                  'எங்கள் கிராமத்தில் குடிநீர் குழாய் உடைந்துவிட்டது, தண்ணீர் வரவில்லை. Utnoor',
+                  'আমাদের গ্রামে কোনো পাকা রাস্তা নেই, বর্ষায় যোগাযোগ বিচ্ছিন্ন হয়ে যায়। Koraput',
+                  'हमनी के गली में नाली उफना जाला, सीवर के पानी से लइकन बेमार हो जात बाड़न। Seelampur',
+                  'गावात पिण्याच्या पाण्याची तीव्र टंचाई आहे, हातपंप बंद पडला आहे. Utnoor',
                 ].map((ex) => <button key={ex} type="button" className="btn btn-sm" style={{ justifyContent: 'flex-start', textAlign: 'left', height: 'auto', padding: '8px 12px' }} onClick={() => setText(ex)}>{ex}</button>)}
               </div>
             </Card>

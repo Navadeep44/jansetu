@@ -1,6 +1,7 @@
 import { lazy, Suspense } from 'react'
 import { Route, Routes } from 'react-router-dom'
-import Layout, { RequireOfficial } from './components/layout/Layout'
+import Layout from './components/layout/Layout'
+import { RequireRole, RequireOfficial } from './components/layout/RequireRole'
 import { Loading } from './components/ui'
 
 // Route-level code splitting keeps the citizen app light on low-end phones.
@@ -22,12 +23,14 @@ const Impact = lazy(() => import('./pages/gov/Impact'))
 const Brics = lazy(() => import('./pages/brics/Brics'))
 const Trust = lazy(() => import('./pages/trust/Trust'))
 const Audit = lazy(() => import('./pages/trust/Trust').then((m) => ({ default: m.Audit })))
+const UserManagement = lazy(() => import('./pages/admin/UserManagement'))
 
 export default function App() {
   return (
     <Suspense fallback={<div className="content"><Loading height={300} /></div>}>
       <Routes>
         <Route element={<Layout />}>
+          {/* Public & Citizen Accessible Pages */}
           <Route index element={<Home />} />
           <Route path="report" element={<Report />} />
           <Route path="track" element={<Track />} />
@@ -35,18 +38,99 @@ export default function App() {
           <Route path="channels" element={<Channels />} />
           <Route path="results" element={<Results />} />
           <Route path="login" element={<Login />} />
-          <Route path="officer" element={<RequireOfficial><Officer /></RequireOfficial>} />
-          <Route path="dashboard" element={<RequireOfficial><Dashboard /></RequireOfficial>} />
-          <Route path="clusters" element={<RequireOfficial><ClusterList /></RequireOfficial>} />
-          <Route path="clusters/:id" element={<RequireOfficial><ClusterDetail /></RequireOfficial>} />
-          <Route path="priorities" element={<RequireOfficial><Priorities /></RequireOfficial>} />
-          <Route path="projects" element={<RequireOfficial><Projects /></RequireOfficial>} />
-          <Route path="ask" element={<RequireOfficial><Ask /></RequireOfficial>} />
-          <Route path="brief" element={<RequireOfficial><Brief /></RequireOfficial>} />
-          <Route path="impact" element={<RequireOfficial><Impact /></RequireOfficial>} />
           <Route path="brics" element={<Brics />} />
           <Route path="trust" element={<Trust />} />
-          <Route path="audit" element={<RequireOfficial><Audit /></RequireOfficial>} />
+
+          {/* Officer Scoped Routes with RBAC Guards */}
+          <Route
+            path="officer"
+            element={
+              <RequireRole roles={['field_officer', 'dept_officer', 'district_officer', 'state_officer', 'admin', 'super_admin']}>
+                <Officer />
+              </RequireRole>
+            }
+          />
+          <Route
+            path="dashboard"
+            element={
+              <RequireRole roles={['district_officer', 'state_officer', 'admin', 'super_admin']}>
+                <Dashboard />
+              </RequireRole>
+            }
+          />
+          <Route
+            path="clusters"
+            element={
+              <RequireRole roles={['dept_officer', 'district_officer', 'state_officer', 'admin', 'super_admin']}>
+                <ClusterList />
+              </RequireRole>
+            }
+          />
+          <Route
+            path="clusters/:id"
+            element={
+              <RequireRole roles={['dept_officer', 'district_officer', 'state_officer', 'admin', 'super_admin']}>
+                <ClusterDetail />
+              </RequireRole>
+            }
+          />
+          <Route
+            path="priorities"
+            element={
+              <RequireRole roles={['district_officer', 'state_officer', 'admin', 'super_admin']}>
+                <Priorities />
+              </RequireRole>
+            }
+          />
+          <Route
+            path="projects"
+            element={
+              <RequireRole roles={['dept_officer', 'district_officer', 'state_officer', 'admin', 'super_admin']}>
+                <Projects />
+              </RequireRole>
+            }
+          />
+          <Route
+            path="ask"
+            element={
+              <RequireRole roles={['district_officer', 'state_officer', 'admin', 'super_admin']}>
+                <Ask />
+              </RequireRole>
+            }
+          />
+          <Route
+            path="brief"
+            element={
+              <RequireRole roles={['state_officer', 'admin', 'super_admin']}>
+                <Brief />
+              </RequireRole>
+            }
+          />
+          <Route
+            path="impact"
+            element={
+              <RequireRole roles={['state_officer', 'admin', 'super_admin']}>
+                <Impact />
+              </RequireRole>
+            }
+          />
+          <Route
+            path="audit"
+            element={
+              <RequireRole roles={['super_admin', 'admin', 'state_officer']}>
+                <Audit />
+              </RequireRole>
+            }
+          />
+          <Route
+            path="admin/users"
+            element={
+              <RequireRole roles={['super_admin', 'admin']}>
+                <UserManagement />
+              </RequireRole>
+            }
+          />
+
           <Route path="*" element={<div className="empty">Page not found.</div>} />
         </Route>
       </Routes>

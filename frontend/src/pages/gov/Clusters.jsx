@@ -8,30 +8,30 @@ import { Badge, Card, ErrorBox, Loading, PageHead, SectorTag, StatusBadge } from
 import { CHANNEL_LABEL, LANG_NAMES, SECTORS, SECTOR_KEYS, date, fmt, money } from '../../lib/format'
 
 export function ClusterList() {
-  const { countryParam } = useApp()
+  const { countryParam, t } = useApp()
   const [sector, setSector] = useState('all')
   const [sort, setSort] = useState('households')
   const { data, loading, error } = useAsync(() => api.clusters({ country: countryParam, category: sector, sort, limit: 60 }), [countryParam, sector, sort])
   return (
     <div className="stack-md">
-      <PageHead title="Grouped needs">Same problem, same place = one need. We count families, not messages.</PageHead>
+      <PageHead title={t('stat_grouped_needs', 'Grouped needs')}>Same problem, same place = one need. We count families, not messages.</PageHead>
       <div className="row">
-        <label className="row small"><span className="muted">Sector</span>
+        <label className="row small"><span className="muted">{t('category', 'Sector')}</span>
           <select className="select" style={{ width: 'auto' }} value={sector} onChange={(e) => setSector(e.target.value)}>
-            <option value="all">All</option>{SECTOR_KEYS.map((s) => <option key={s} value={s}>{SECTORS[s].label}</option>)}</select></label>
+            <option value="all">{t('all', 'All')}</option>{SECTOR_KEYS.map((s) => <option key={s} value={s}>{SECTORS[s].label}</option>)}</select></label>
         <label className="row small"><span className="muted">Sort</span>
           <select className="select" style={{ width: 'auto' }} value={sort} onChange={(e) => setSort(e.target.value)}>
             <option value="households">Most households</option><option value="severity">Most severe</option><option value="recent">Most recent</option></select></label>
         {data && <span className="small muted">{fmt(data.total)} clusters</span>}
       </div>
       <ErrorBox error={error} />
-      {loading ? <Loading height={400} /> : (
+      {loading || !data ? <Loading height={400} /> : (
         <div className="grid g-3">
-          {data.items.map((c) => (
+          {(data.items || []).map((c) => (
             <Link key={c.id} to={`/clusters/${c.id}`} className="card role-card">
               <div className="row-between"><SectorTag sector={c.category} short /><StatusBadge status={c.status} /></div>
               <h3>{c.title}</h3>
-              <div className="row small"><span className="mono"><strong>{fmt(c.unique_households)}</strong> households</span><span className="muted">· {fmt(c.request_count)} reports</span></div>
+              <div className="row small"><span className="mono"><strong>{fmt(c.unique_households)}</strong> {t('th_families', 'households')}</span><span className="muted">· {fmt(c.request_count)} {t('nav_report', 'reports')}</span></div>
               <div className="row">
                 {c.languages.slice(0, 4).map((l) => <Badge key={l}>{LANG_NAMES[l] || l}</Badge>)}
                 {c.vulnerable_groups.slice(0, 2).map((g) => <Badge key={g} tone="violet">{g.replace('_', ' ')}</Badge>)}
@@ -47,14 +47,15 @@ export function ClusterList() {
 }
 
 export function ClusterDetail() {
+  const { t } = useApp()
   const { id } = useParams()
   const { data, loading, error } = useAsync(() => api.cluster(id), [id])
-  if (loading) return <Loading height={400} />
+  if (loading || !data) return <Loading height={400} />
   if (error) return <ErrorBox error={error} />
-  const c = data.cluster
+  const c = data.cluster || {}
   return (
     <div className="stack-md">
-      <PageHead title={c.title} actions={<Link to="/clusters" className="btn btn-sm">All grouped needs</Link>}>{c.summary}</PageHead>
+      <PageHead title={c.title || 'Cluster Detail'} actions={<Link to="/clusters" className="btn btn-sm">{t('stat_grouped_needs', 'All grouped needs')}</Link>}>{c.summary}</PageHead>
       <div className="grid g-4">
         <div className="card stat"><span className="stat-label">Unique households</span><span className="stat-value">{fmt(c.unique_households)}</span></div>
         <div className="card stat"><span className="stat-label">Reports</span><span className="stat-value">{fmt(c.request_count)}</span></div>
@@ -84,7 +85,7 @@ export function ClusterDetail() {
           </Card>
           <Card title="Who and how">
             <dl className="kv">
-              <dt>Area</dt><dd>{data.area.name}, {data.area.district}</dd>
+              <dt>{t('th_area', 'Area')}</dt><dd>{data.area.name}, {data.area.district}</dd>
               <dt>Channels</dt><dd>{Object.entries(c.channels).map(([k, v]) => `${CHANNEL_LABEL[k] || k} ${v}`).join(' · ')}</dd>
               <dt>Gender</dt><dd>{Object.entries(data.gender).map(([k, v]) => `${k} ${v}`).join(' · ')}</dd>
               <dt>Vulnerable</dt><dd>{c.vulnerable_groups.join(', ') || '—'}</dd>

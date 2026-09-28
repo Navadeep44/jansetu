@@ -75,20 +75,42 @@ export default function VoiceInput({ lang, onTranscript, onAudio, labels }) {
 }
 
 /** Reads a message aloud in the citizen's language (for low-literacy users). */
-export function SpeakButton({ text, lang, label = 'Listen' }) {
+export function SpeakButton({ text, lang = 'en', label = 'Listen' }) {
+  const [speaking, setSpeaking] = useState(false)
   const ok = typeof window !== 'undefined' && 'speechSynthesis' in window
-  if (!ok) return null
+  if (!ok || !text) return null
+
   const speak = () => {
-    window.speechSynthesis.cancel()
-    const u = new SpeechSynthesisUtterance(text)
-    u.lang = SPEECH_TAGS[lang] || 'en-IN'
-    const v = window.speechSynthesis.getVoices().find((x) => x.lang?.toLowerCase().startsWith(u.lang.slice(0, 2).toLowerCase()))
-    if (v) u.voice = v
-    window.speechSynthesis.speak(u)
+    try {
+      window.speechSynthesis.cancel()
+      if (speaking) {
+        setSpeaking(false)
+        return
+      }
+      const tag = SPEECH_TAGS[lang] || 'en-IN'
+      const u = new SpeechSynthesisUtterance(text)
+      u.lang = tag
+      const voices = window.speechSynthesis.getVoices()
+      const langPrefix = (tag.split('-')[0] || lang).toLowerCase()
+      const exactVoice = voices.find((x) => x.lang?.toLowerCase() === tag.toLowerCase())
+      const prefixVoice = voices.find((x) => x.lang?.toLowerCase().startsWith(langPrefix))
+      const indicVoice = voices.find((x) => x.lang?.toLowerCase().includes('in'))
+      if (exactVoice) u.voice = exactVoice
+      else if (prefixVoice) u.voice = prefixVoice
+      else if (indicVoice) u.voice = indicVoice
+
+      u.onstart = () => setSpeaking(true)
+      u.onend = () => setSpeaking(false)
+      u.onerror = () => setSpeaking(false)
+      window.speechSynthesis.speak(u)
+    } catch {
+      setSpeaking(false)
+    }
   }
+
   return (
-    <button type="button" className="btn btn-sm" onClick={speak} aria-label={`${label}: ${text.slice(0, 60)}`}>
-      <Volume2 size={16} aria-hidden="true" />{label}
+    <button type="button" className={`btn btn-sm ${speaking ? 'btn-primary' : ''}`} onClick={speak} aria-label={`${label}: ${text.slice(0, 60)}`}>
+      <Volume2 size={16} aria-hidden="true" />{speaking ? 'Speaking…' : label}
     </button>
   )
 }
