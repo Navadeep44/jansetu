@@ -174,7 +174,7 @@ export default function Landing() {
             <motion.div className="lp-float lp-float-3" animate={{ y: [0, -8, 0] }} transition={{ duration: 5.5, repeat: Infinity, ease: 'easeInOut', delay: 1.6 }}>
               <VolumeX size={16} aria-hidden="true" /><span><strong>Silent area found</strong><small>High need, few voices</small></span>
             </motion.div>
-            <div className="lp-legend"><span><i className="amber" />Live nodes</span><span><i className="sky" />Partner nodes</span></div>
+            <div className="lp-legend"><span><i className="amber" />Live pilots: India, Brazil, South Africa</span><span><i className="sky" />BRICS partners</span></div>
           </div>
         </div>
         <a href="#services" className="lp-scroll" aria-label="Scroll to services"><span /></a>
