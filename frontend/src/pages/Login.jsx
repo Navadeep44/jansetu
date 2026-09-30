@@ -626,9 +626,15 @@ export default function Login() {
       {tab === 'citizen' && (
         <div className="grid g-2" style={{ alignItems: 'start' }}>
           <Card
-            title={t('citizen_login_title', 'Citizen Access')}
-            sub={t('citizen_login_sub', 'Track your complaints, view resolution proofs, and verify work')}
+            title={t('citizen_login_title', 'Citizen Access (Optional)')}
+            sub={t('citizen_login_sub', 'Login is optional — only needed if you want to see all your past requests together in one place.')}
           >
+            <div className="alert alert-info" style={{ marginBottom: 16 }}>
+              <Info size={16} aria-hidden="true" />
+              <div className="small">
+                <strong>No login required to file or track:</strong> Anyone can report a problem, track status by tracking ID, and confirm work without creating an account or logging in.
+              </div>
+            </div>
             <div className="row mb-md" style={{ marginBottom: 16 }}>
               <button
                 type="button"

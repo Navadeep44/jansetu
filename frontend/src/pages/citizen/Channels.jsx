@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { MapPin, Phone, Send } from 'lucide-react'
+import { MapPin, MessageCircle, Phone, Send } from 'lucide-react'
 import { api } from '../../api/client'
 import { useApp } from '../../context/AppContext'
 import { Badge, Card, PageHead, SectorTag, Seg } from '../../components/ui'
@@ -14,7 +14,12 @@ const SCRIPTS = [
   { label: 'Marathi: power cut for 4 days, Utnoor', msgs: ['गावात चार दिवसांपासून वीज नाही, ट्रान्सफॉर्मर जळाला आहे. Utnoor'] },
   { label: 'Check status by tracking ID', msgs: ['status JS-IN-LAKSH1'] },
 ]
-const HEADS = { whatsapp: 'WhatsApp · JanSetu', telegram: 'Telegram · @JanSetuBot', sms: 'SMS · 1800-JANSETU', ivr: 'IVR call · 1800-JANSETU' }
+const HEADS = {
+  whatsapp: 'WhatsApp (Demo Simulation) · JanSetu',
+  telegram: 'Telegram (Demo Simulation) · @JanSetuBot',
+  sms: 'SMS (Demo Simulation) · 1800-JANSETU',
+  ivr: 'IVR Call (Demo Simulation) · 1800-JANSETU',
+}
 
 export default function Channels() {
   const { t } = useApp()
@@ -39,11 +44,24 @@ export default function Channels() {
   return (
     <div className="stack-md">
       <PageHead title={t('channels_title', 'WhatsApp & phone demo')}>
-        {t('channels_subtitle', 'Chat exactly like a citizen would. Real WhatsApp, Telegram, phone calls and SMS use the same engine.')}
+        {t('channels_subtitle', 'Interactive simulation of citizen mobile channels. Real WhatsApp, Telegram, phone calls and SMS connect to the same AI backend.')}
       </PageHead>
       <div className="grid g-main" style={{ alignItems: 'start' }}>
-        <div className="row" style={{ alignItems: 'flex-start', gap: 24 }}>
+        <div className="stack-md" style={{ maxWidth: 360 }}>
           <div className="phone" aria-label="Phone chat simulator">
+            {/* Clear Demo Simulation Banner */}
+            <div style={{
+              background: '#fef3c7',
+              color: '#92400e',
+              padding: '6px 12px',
+              fontSize: '0.75rem',
+              fontWeight: 700,
+              textAlign: 'center',
+              letterSpacing: '0.04em',
+              borderBottom: '1px solid #fde68a'
+            }}>
+              DEMO SIMULATION · NOT REAL WHATSAPP
+            </div>
             <div className={`phone-head ${channel}`}>
               <Phone size={18} aria-hidden="true" /><strong>{HEADS[channel]}</strong>
             </div>
@@ -57,6 +75,41 @@ export default function Channels() {
               <input value={text} onChange={(e) => setText(e.target.value)} placeholder="Message" aria-label="Message" />
               <button className="btn btn-icon btn-primary" aria-label="Send" style={{ borderRadius: '50%' }}><Send size={18} /></button>
             </form>
+          </div>
+
+          {/* Real WhatsApp Channel Card */}
+          <div className="card" style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', padding: 16 }}>
+            <div className="row" style={{ gap: 8, color: '#166534', fontWeight: 600, marginBottom: 6 }}>
+              <MessageCircle size={18} />
+              <span>Real WhatsApp Channel</span>
+            </div>
+            <p className="small" style={{ color: '#14532d', margin: '0 0 12px 0' }}>
+              Want to try on your real phone? Connect directly to our official WhatsApp Business bot number (+91 90000 11111).
+            </p>
+            <div style={{ display: 'flex', gap: 16, alignItems: 'center', marginBottom: 12 }}>
+              <img
+                src="https://api.qrserver.com/v1/create-qr-code/?size=100x100&data=https%3A%2F%2Fwa.me%2F919000011111%3Ftext%3DNamaste%20JanSetu"
+                alt="WhatsApp QR Code"
+                width={88}
+                height={88}
+                style={{ borderRadius: 6, border: '1px solid #86efac', background: '#fff', padding: 4 }}
+              />
+              <div className="stack-xs">
+                <span className="xs muted">Scan with your camera or tap below to open WhatsApp:</span>
+                <a
+                  href="https://wa.me/919000011111?text=Namaste%20JanSetu%2C%20I%20want%20to%20report%20a%20problem"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="btn btn-sm btn-primary"
+                  style={{ background: '#25d366', borderColor: '#25d366', color: '#fff', width: 'fit-content' }}
+                >
+                  <MessageCircle size={16} /> Chat on WhatsApp
+                </a>
+              </div>
+            </div>
+            <div className="xs muted">
+              Official JanSetu helpline bot · Free and confidential
+            </div>
           </div>
         </div>
         <div className="stack-md">

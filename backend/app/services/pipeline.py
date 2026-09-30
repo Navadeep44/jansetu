@@ -36,7 +36,8 @@ def get_department_for_sector(sector: str) -> str:
 
 
 def new_tracking_id(country: str) -> str:
-    return f"JS-{country or 'XX'}-" + "".join(secrets.choice(_ALPH) for _ in range(6))
+    # 10 random alphanumeric chars (>50 bits entropy) preventing brute force guessing
+    return f"JS-{country or 'XX'}-" + "".join(secrets.choice(_ALPH) for _ in range(10))
 
 
 def notify(db: Session, req: CitizenRequest, kind: str, message: str) -> Notification:
@@ -124,6 +125,9 @@ def process(db: Session, *, text: str, channel: str = "web", lang_hint: str | No
     if x["confidence"] < 0.5 or x["category"] == "other":
         flags.append("low_confidence")
 
+    phone_digits = "".join(c for c in (identifier or "") if c.isdigit())
+    phone_last4 = phone_digits[-4:] if len(phone_digits) >= 4 else None
+
     req = CitizenRequest(
         tracking_id=new_tracking_id(country), channel=channel, language=x["language"], original_text=text,
         redacted_text=redacted, translated_text=privacy.redact(x["translated_text"]), translation_mode=x["translation_mode"],
@@ -132,7 +136,7 @@ def process(db: Session, *, text: str, channel: str = "web", lang_hint: str | No
         location_text=location_text or "", category=x["category"], subcategory=x["subcategory"], request_type=x["request_type"],
         severity=x["severity"], affected_people=int(x.get("affected_people") or 1), vulnerable_groups=x["vulnerable_groups"],
         sdg=x["sdg"], confidence=x["confidence"], extraction_mode=x["extraction_mode"],
-        household_hash=privacy.household_hash(identifier), anonymous=anonymous, gender=gender, assisted_by=assisted_by,
+        household_hash=privacy.household_hash(identifier), phone_last4=phone_last4, anonymous=anonymous, gender=gender, assisted_by=assisted_by,
         supporters=max(1, supporters), flags=flags, proof_count=0, created_at=created_at or datetime.utcnow(),
         updated_at=created_at or datetime.utcnow(),
     )

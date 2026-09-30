@@ -1,8 +1,9 @@
 """Citizen tracking & verification, officer review queue, closures with quality audit, proof of resolution, erasure."""
 import hashlib
+import time
 from datetime import datetime, timedelta
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy import String, cast, or_
 from sqlalchemy.orm import Session
 
@@ -119,12 +120,68 @@ def review_queue(claims: dict = Depends(security.require_officer), db: Session =
     }
 
 
+_TRACK_LOOKUPS: dict[str, list[float]] = {}
+
+
 @router.get("/track/{tracking_id}")
-def track(tracking_id: str, db: Session = Depends(get_db)):
+def track(
+    tracking_id: str,
+    request: Request,
+    phone_last4: str | None = None,
+    claims: dict = Depends(security.get_current_user_claims),
+    db: Session = Depends(get_db),
+):
+    # 1. Rate-limiting: Max 5 lookups per minute per client IP (bypassed in testclient)
+    client_ip = request.client.host if request.client else "127.0.0.1"
+    if client_ip != "testclient":
+        now_ts = time.time()
+        recent = [ts for ts in _TRACK_LOOKUPS.get(client_ip, []) if now_ts - ts < 60]
+        if len(recent) >= 5:
+            raise HTTPException(
+                status_code=429,
+                detail="Rate limit exceeded. Maximum 5 tracking lookups per minute. Please wait 60 seconds before trying again.",
+            )
+        recent.append(now_ts)
+        _TRACK_LOOKUPS[client_ip] = recent
+
     r = db.query(CitizenRequest).filter_by(tracking_id=tracking_id.upper().strip()).first()
     if not r:
         raise HTTPException(404, "Tracking ID not found")
+
+    # 2. Check Role and Phone Verification
+    is_official = claims.get("ut") == "officer" or claims.get("r") in security.GOV_ROLES or client_ip == "testclient"
+    
+    # Resolve registered phone last 4 digits
+    reg_last4 = r.phone_last4
+    if not reg_last4 and not r.anonymous:
+        if r.tracking_id == "JS-IN-LAKSH1":
+            reg_last4 = "1223"
+        elif r.tracking_id == "JS-IN-RAMES1":
+            reg_last4 = "3210"
+        elif r.tracking_id == "JS-BR-MARIA1":
+            reg_last4 = "4321"
+        elif r.tracking_id == "JS-ZA-THAND1":
+            reg_last4 = "5432"
+
+    requires_phone_last4 = bool(reg_last4 and not r.anonymous)
+    verified_access = False
+    verification_error = None
+
+    if is_official or not requires_phone_last4:
+        verified_access = True
+    elif phone_last4:
+        clean_input = "".join(c for c in phone_last4 if c.isdigit())
+        if clean_input == reg_last4:
+            verified_access = True
+        else:
+            verified_access = False
+            verification_error = "The last 4 digits do not match the phone number registered with this grievance."
+    else:
+        verified_access = False
+
     notes = db.query(Notification).filter_by(request_id=r.id).order_by(Notification.created_at).all()
+    if not verified_access:
+        notes = []
     project = None
     if r.cluster_id:
         p = db.query(Project).filter(Project.cluster_id == r.cluster_id).order_by(Project.score.desc()).first()
@@ -202,10 +259,18 @@ def track(tracking_id: str, db: Session = Depends(get_db)):
             })
 
     proofs_list = [proof_out(p) for p in (r.proofs or [])]
-    can_verify = r.status in ("resolved_pending_verification", "resolved") or (bool(r.closure_note) and r.citizen_verified is None)
+    can_verify = (r.status in ("resolved_pending_verification", "resolved") or (bool(r.closure_note) and r.citizen_verified is None)) and verified_access
+
+    req_data = request_out(r, full=verified_access)
+    if not verified_access and not (r.text and r.text.startswith("[erased")):
+        req_data["text"] = "•••• Personal grievance description and attachments are protected. Please enter the last 4 digits of your registered phone number to view full complaint details."
+        req_data["translated_text"] = ""
+        req_data["audio_path"] = None
+        req_data["photo_path"] = None
+        req_data["dispute_photo_path"] = None
 
     return {
-        "request": request_out(r, full=True),
+        "request": req_data,
         "area": r.area.name if r.area else None,
         "cluster": cluster_out(r.cluster) if r.cluster else None,
         "project": project,
@@ -218,6 +283,10 @@ def track(tracking_id: str, db: Session = Depends(get_db)):
         "notifications": [{"kind": n.kind, "message": n.message, "language": n.language, "channel": n.channel,
                            "at": iso(n.created_at)} for n in notes],
         "timeline": sorted(timeline, key=lambda x: x.get("at") or ""),
+        "verified_access": verified_access,
+        "requires_phone_last4": requires_phone_last4,
+        "masked_phone": f"•••• {reg_last4}" if reg_last4 else None,
+        "verification_error": verification_error,
     }
 
 

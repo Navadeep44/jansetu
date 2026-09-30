@@ -268,7 +268,7 @@ class Appeal(Base):
     __tablename__ = "appeals"
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     request_id: Mapped[int] = mapped_column(ForeignKey("requests.id"), index=True)
-    tracking_id: Mapped[str] = mapped_column(String(30), index=True)
+    tracking_id: Mapped[str] = mapped_column(String(32), index=True)
     citizen_phone: Mapped[str] = mapped_column(String(30), default="")
     reason: Mapped[str] = mapped_column(Text)
     evidence_url: Mapped[str] = mapped_column(Text, default="")

@@ -108,7 +108,11 @@ export default function Home() {
         <p className="lead">{t('home_hero_lead', 'Tell the government what your area needs, in your own language. JanSetu makes sure it reaches the right people, and shows what they did.')}</p>
         <div className="row mt-lg">
           <Link to="/report" className="btn btn-primary btn-lg"><Megaphone size={20} aria-hidden="true" />{t('home_report_btn', 'Report a problem')}</Link>
-          <Link to={isOfficial ? '/dashboard' : '/login'} className="btn btn-lg btn-hero-ghost"><LogIn size={20} aria-hidden="true" />{t('home_official_btn', 'I am an official')}</Link>
+          {isOfficial ? (
+            <Link to="/dashboard" className="btn btn-lg btn-hero-ghost"><BarChart3 size={20} aria-hidden="true" />Policymaker Dashboard</Link>
+          ) : (
+            <Link to="/track" className="btn btn-lg btn-hero-ghost"><SearchCheck size={20} aria-hidden="true" />{t('nav_track', 'Track your request')}</Link>
+          )}
         </div>
         <p className="small" style={{ color: '#94a3b8', marginTop: 12 }}>{t('home_hero_sub', 'No login needed for citizens · Works in 12+ Indian languages · Free and open source')}</p>
       </section>
@@ -155,17 +159,17 @@ export default function Home() {
 
       <section className="grid g-2">
         <div className="card">
-          <h3>What the colours mean</h3>
+          <h3>{t('home_what_colours_mean', 'What the colours mean')}</h3>
           <ColorGuide />
         </div>
         <div className="card">
-          <h3>What makes it different</h3>
+          <h3>{t('home_what_different', 'What makes it different')}</h3>
           <ul className="check-list">
-            <li><CheckCircle2 size={18} aria-hidden="true" /><span>Counts <strong>families</strong>, not repeated messages</span></li>
-            <li><VolumeX size={18} aria-hidden="true" /><span>Finds <strong>silent villages</strong> that can't complain</span></li>
-            <li><Languages size={18} aria-hidden="true" /><span>Replies in <strong>your language</strong>, can read it aloud</span></li>
-            <li><Search size={18} aria-hidden="true" /><span>Explains <strong>why</strong> a project is chosen</span></li>
-            <li><ThumbsUp size={18} aria-hidden="true" /><span>A case closes only when <strong>you confirm</strong></span></li>
+            <li><CheckCircle2 size={18} aria-hidden="true" /><span>{t('home_diff_families', 'Counts families, not repeated messages')}</span></li>
+            <li><VolumeX size={18} aria-hidden="true" /><span>{t('home_diff_silent', "Finds silent villages that can't complain")}</span></li>
+            <li><Languages size={18} aria-hidden="true" /><span>{t('home_diff_language', 'Replies in your language, can read it aloud')}</span></li>
+            <li><Search size={18} aria-hidden="true" /><span>{t('home_diff_why', 'Explains why a project is chosen')}</span></li>
+            <li><ThumbsUp size={18} aria-hidden="true" /><span>{t('home_diff_confirm', 'A case closes only when you confirm')}</span></li>
           </ul>
         </div>
       </section>
@@ -177,7 +181,7 @@ export default function Home() {
             <Link key={idx} to={`/track/${s.id}`} className="card role-card">
               <strong>{s.who}</strong>
               <p className="small muted" style={{ margin: 0 }}>{s.what}</p>
-              <span className="row small" style={{ color: 'var(--color-accent)', marginTop: 'auto' }}>See journey <ArrowRight size={14} aria-hidden="true" /></span>
+              <span className="row small" style={{ color: 'var(--color-accent)', marginTop: 'auto' }}>{t('home_see_journey', 'See journey')} <ArrowRight size={14} aria-hidden="true" /></span>
             </Link>
           ))}
         </div>

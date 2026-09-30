@@ -1,5 +1,6 @@
 import { AlertTriangle, Loader2 } from 'lucide-react'
 import { SECTORS, STATUS_LABEL, STATUS_TONE, ngiColor } from '../../lib/format'
+import { useApp } from '../../context/AppContext'
 
 export function Card({ title, sub, actions, children, className = '', ...rest }) {
   return (
@@ -109,9 +110,17 @@ export const COLOR_MEANING = [
 ]
 
 export function ColorGuide({ compact = false }) {
+  const { t } = useApp()
+  const items = [
+    { tone: 'blue', label: t('color_blue_label', 'Blue'), meaning: t('color_blue_meaning', 'Action or in progress') },
+    { tone: 'green', label: t('color_green_label', 'Green'), meaning: t('color_green_meaning', 'Done or confirmed') },
+    { tone: 'amber', label: t('color_amber_label', 'Amber'), meaning: t('color_amber_meaning', 'Needs attention or a decision') },
+    { tone: 'red', label: t('color_red_label', 'Red'), meaning: t('color_red_meaning', 'Urgent or very high need') },
+    { tone: 'violet', label: t('color_violet_label', 'Purple'), meaning: t('color_violet_meaning', 'Silent area: high need, few voices') },
+  ]
   return (
     <ul className={`color-guide ${compact ? 'compact' : ''}`}>
-      {COLOR_MEANING.map((c) => (
+      {items.map((c) => (
         <li key={c.tone}><span className={`badge badge-${c.tone}`}>{c.label}</span><span className="small">{c.meaning}</span></li>
       ))}
     </ul>

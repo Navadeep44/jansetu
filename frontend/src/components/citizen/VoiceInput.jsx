@@ -7,17 +7,26 @@ import { SPEECH_TAGS } from '../../lib/format'
  *  transcribed server-side (Bhashini / Whisper) or by a human officer. */
 export default function VoiceInput({ lang, onTranscript, onAudio, labels }) {
   const [recording, setRecording] = useState(false)
+  const [timer, setTimer] = useState(0)
   const [interim, setInterim] = useState('')
   const recRef = useRef(null)
   const mediaRef = useRef(null)
   const chunks = useRef([])
+  const timerRef = useRef(null)
   const SR = typeof window !== 'undefined' && (window.SpeechRecognition || window.webkitSpeechRecognition)
   const canRecord = typeof window !== 'undefined' && !!navigator.mediaDevices?.getUserMedia
 
-  useEffect(() => () => { recRef.current?.abort?.(); mediaRef.current?.stream?.getTracks().forEach((t) => t.stop()) }, [])
+  useEffect(() => () => {
+    recRef.current?.abort?.()
+    mediaRef.current?.stream?.getTracks().forEach((t) => t.stop())
+    if (timerRef.current) clearInterval(timerRef.current)
+  }, [])
 
   const start = async () => {
     setInterim('')
+    setTimer(0)
+    timerRef.current = setInterval(() => setTimer((s) => s + 1), 1000)
+
     if (canRecord) {
       try {
         const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
@@ -47,8 +56,8 @@ export default function VoiceInput({ lang, onTranscript, onAudio, labels }) {
         setInterim(tmp)
         if (finalText) onTranscript(finalText.trim())
       }
-      rec.onend = () => setRecording(false)
-      rec.onerror = () => setRecording(false)
+      rec.onend = () => stop()
+      rec.onerror = () => stop()
       rec.start()
       recRef.current = rec
     }
@@ -56,19 +65,64 @@ export default function VoiceInput({ lang, onTranscript, onAudio, labels }) {
   }
 
   const stop = () => {
+    if (timerRef.current) {
+      clearInterval(timerRef.current)
+      timerRef.current = null
+    }
     recRef.current?.stop()
     if (mediaRef.current?.state === 'recording') mediaRef.current.stop()
     setRecording(false)
   }
 
+  const formatTimer = (sec) => {
+    const m = Math.floor(sec / 60).toString().padStart(2, '0')
+    const s = (sec % 60).toString().padStart(2, '0')
+    return `${m}:${s}`
+  }
+
   return (
-    <div className="stack" style={{ alignItems: 'center', textAlign: 'center' }}>
-      <button type="button" className={`mic-btn ${recording ? 'recording' : ''}`} onClick={recording ? stop : start}
-        aria-pressed={recording} aria-label={recording ? labels.stop : labels.speak}>
-        {recording ? <Square size={32} /> : <Mic size={36} />}
+    <div className="stack" style={{ alignItems: 'center', textAlign: 'center', width: '100%' }}>
+      <button
+        type="button"
+        className={`mic-btn ${recording ? 'recording' : ''}`}
+        style={recording ? {
+          background: '#ef4444',
+          borderColor: '#dc2626',
+          boxShadow: '0 0 0 6px rgba(239, 68, 68, 0.3)',
+          animation: 'pulse 1.2s infinite'
+        } : {}}
+        onClick={recording ? stop : start}
+        aria-pressed={recording}
+        aria-label={recording ? labels.stop : labels.speak}
+      >
+        {recording ? <Square size={28} color="#fff" /> : <Mic size={36} />}
       </button>
-      <div className="small" aria-live="polite">{recording ? labels.listening : labels.speak}</div>
-      {interim && <div className="small muted">{interim}</div>}
+
+      {/* Recording Waveform & Timer Feedback */}
+      {recording ? (
+        <div className="stack-xs" style={{ alignItems: 'center' }}>
+          <div className="waveform" aria-hidden="true" style={{ display: 'flex', gap: 4, height: 28, alignItems: 'center', margin: '4px 0' }}>
+            <span style={{ width: 4, height: 12, background: '#ef4444', borderRadius: 2, animation: 'pulseWave 0.6s infinite alternate' }} />
+            <span style={{ width: 4, height: 24, background: '#ef4444', borderRadius: 2, animation: 'pulseWave 0.8s infinite alternate' }} />
+            <span style={{ width: 4, height: 18, background: '#ef4444', borderRadius: 2, animation: 'pulseWave 0.5s infinite alternate' }} />
+            <span style={{ width: 4, height: 28, background: '#ef4444', borderRadius: 2, animation: 'pulseWave 0.7s infinite alternate' }} />
+            <span style={{ width: 4, height: 14, background: '#ef4444', borderRadius: 2, animation: 'pulseWave 0.9s infinite alternate' }} />
+          </div>
+          <div className="row" style={{ gap: 6, color: '#dc2626', fontWeight: 600, fontSize: '0.9rem' }}>
+            <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#dc2626', display: 'inline-block' }} />
+            <span>Recording · {formatTimer(timer)}</span>
+          </div>
+          <span className="small text-danger" style={{ fontWeight: 500 }}>
+            Tap the red square to stop recording
+          </span>
+        </div>
+      ) : (
+        <div className="small" aria-live="polite" style={{ fontWeight: 500 }}>
+          {labels.speak}
+        </div>
+      )}
+
+      {interim && <div className="small muted" style={{ fontStyle: 'italic', maxWidth: 360 }}>"{interim}"</div>}
       {!SR && <div className="help">{labels.unsupported}</div>}
     </div>
   )

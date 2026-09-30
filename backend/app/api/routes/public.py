@@ -87,7 +87,7 @@ def board(country: str | None = None, db: Session = Depends(get_db)):
     """Transparency: what citizens asked for and what government did about it."""
     q = db.query(CitizenRequest)
     pq = db.query(Project).filter(Project.status.in_(["approved", "in_progress", "completed"]))
-    if country:
+    if country and country != "all":
         q = q.filter(CitizenRequest.country_code == country)
         pq = pq.filter(Project.country_code == country)
     projects = pq.order_by(Project.status.desc(), Project.completed_at.desc()).all()
@@ -101,6 +101,24 @@ def board(country: str | None = None, db: Session = Depends(get_db)):
             voices = (db.query(func.count(func.distinct(CitizenRequest.household_hash)))
                       .filter(CitizenRequest.area_id == p.area_id, CitizenRequest.category == p.sector).scalar() or 0)
         items.append({**project_out(p), "citizen_voices": voices})
+
+    reopened_requests = q.filter(CitizenRequest.status == "reopened").order_by(CitizenRequest.updated_at.desc()).limit(50).all()
+    disputed_cases = [
+        {
+            "id": r.id,
+            "tracking_id": r.tracking_id,
+            "category": r.category,
+            "area": r.area.name if r.area else "Unknown",
+            "state": r.area.state if r.area else None,
+            "country": r.country_code or (r.area.country_code if r.area else "IN"),
+            "dispute_reason": r.dispute_reason or "Work incomplete or not functioning as claimed",
+            "status": r.status,
+            "updated_at": r.updated_at.isoformat() if r.updated_at else None,
+            "department": r.assigned_department or pipeline.get_department_for_sector(r.category),
+        }
+        for r in reopened_requests
+    ]
+
     return {
         "requests": q.count(),
         "households": q.with_entities(func.count(func.distinct(CitizenRequest.household_hash))).scalar(),
@@ -110,6 +128,7 @@ def board(country: str | None = None, db: Session = Depends(get_db)):
         "in_progress": sum(1 for i in items if i["status"] == "in_progress"),
         "approved": sum(1 for i in items if i["status"] == "approved"),
         "items": items,
+        "disputed_cases": disputed_cases,
     }
 
 

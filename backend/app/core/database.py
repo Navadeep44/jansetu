@@ -49,6 +49,7 @@ def init_db():
                 ("in_progress_at", "DATETIME"),
                 ("resolved_at", "DATETIME"),
                 ("proof_count", "INTEGER DEFAULT 0"),
+                ("phone_last4", "VARCHAR(4)"),
             ],
             "projects": [
                 ("sdg", "VARCHAR(20) DEFAULT ''"),

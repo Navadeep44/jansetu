@@ -53,7 +53,8 @@ class CitizenRequest(Base):
     """One citizen voice. Many requests roll up into one DemandCluster."""
     __tablename__ = "requests"
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    tracking_id: Mapped[str] = mapped_column(String(20), unique=True, index=True)
+    tracking_id: Mapped[str] = mapped_column(String(32), unique=True, index=True)
+    phone_last4: Mapped[str | None] = mapped_column(String(4), nullable=True, default=None, index=True)
     channel: Mapped[str] = mapped_column(String(20))  # whatsapp|telegram|ivr|sms|web|assisted|community|import
     language: Mapped[str] = mapped_column(String(8))
     original_text: Mapped[str] = mapped_column(Text)

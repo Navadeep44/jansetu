@@ -58,7 +58,7 @@ export const api = {
   intakeForm: (form) => request('/api/intake/form', { method: 'POST', form }),
   intakeText: (body) => request('/api/intake/text', { method: 'POST', body }),
   community: (body) => request('/api/intake/community', { method: 'POST', body }),
-  track: (tid) => request(`/api/track/${encodeURIComponent(tid)}`),
+  track: (tid, phone_last4) => request(`/api/track/${encodeURIComponent(tid)}` + qs({ phone_last4 })),
   verify: (tid, body) => request(`/api/track/${encodeURIComponent(tid)}/verify`, { method: 'POST', body }),
   confirmResolution: (tid, body = {}) => request(`/api/track/${encodeURIComponent(tid)}/confirm`, { method: 'POST', body }),
   disputeResolution: (tid, body) => request(`/api/track/${encodeURIComponent(tid)}/dispute`, { method: 'POST', body }),
