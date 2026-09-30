@@ -1,5 +1,5 @@
-// Thin API client. VITE_API_URL lets the frontend talk to a remote node; defaults to same origin (/api via Vite proxy).
-const BASE = import.meta.env.VITE_API_URL || ''
+// Thin API client. VITE_API_URL lets the frontend talk to a remote node; defaults to http://127.0.0.1:8000 in local dev or same origin.
+const BASE = import.meta.env.VITE_API_URL || (typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') ? 'http://127.0.0.1:8000' : '')
 
 let authToken = null
 let onUnauthorised = () => {}
@@ -88,10 +88,51 @@ export const api = {
   kpis: () => request('/api/impact/kpis'),
   gramSabha: (district, area) => request('/api/plans/gram-sabha' + qs({ district, area })),
   gramSabhaCsv: (district, area) => `${BASE}/api/plans/gram-sabha.csv${qs({ district, area })}`,
+  // Complete grievance-to-budget cycle APIs
+  geoHierarchy: () => request('/api/geo/hierarchy'),
+  cycleIntake: (form) => request('/api/cycle/intake', { method: 'POST', form }),
+  verifyHead: (id, form) => request(`/api/requests/${id}/verify-head`, { method: 'POST', form: toFormData(form) }),
+  assignCycle: (id, form) => request(`/api/requests/${id}/assign-cycle`, { method: 'POST', form: toFormData(form) }),
+  inspectAndBudget: (id, form) => request(`/api/requests/${id}/inspect-and-budget`, { method: 'POST', form: toFormData(form) }),
+  forwardCollector: (id, form) => request(`/api/requests/${id}/forward-to-collector`, { method: 'POST', form: toFormData(form) }),
+  collectorDecision: (id, form) => request(`/api/requests/${id}/budget/decision`, { method: 'POST', form: toFormData(form) }),
+  respondNegotiation: (id, form) => request(`/api/requests/${id}/budget/respond-negotiation`, { method: 'POST', form: toFormData(form) }),
+  logExpense: (id, form) => request(`/api/requests/${id}/expenses`, { method: 'POST', form: toFormData(form) }),
+  completeWork: (id, form) => request(`/api/requests/${id}/complete-work`, { method: 'POST', form: toFormData(form) }),
+  reviewProofCycle: (id, form) => request(`/api/requests/${id}/proof/review-cycle`, { method: 'POST', form: toFormData(form) }),
+  citizenConfirmCycle: (tid, form) => request(`/api/requests/${encodeURIComponent(tid)}/citizen-confirm`, { method: 'POST', form: toFormData(form) }),
+  assignableOfficers: (params) => request('/api/officer/assignable-officers' + qs(params)),
+  collectorInbox: (params) => request('/api/cycle/collector-inbox' + qs(params)),
+  collectorSummary: (params) => request('/api/cycle/collector-summary' + qs(params)),
+  stateSummary: (params) => request('/api/cycle/state-summary' + qs(params)),
+  dhTeamSummary: () => request('/api/cycle/dh-team-summary'),
+  foWallet: () => request('/api/cycle/fo-wallet'),
+  budgetFunnel: (params) => request('/api/analytics/budget-funnel' + qs(params)),
+  cycleMetrics: (params) => request('/api/analytics/cycle-metrics' + qs(params)),
+  negotiationStats: (params) => request('/api/analytics/negotiation-stats' + qs(params)),
+  casesByMandal: (params) => request('/api/analytics/cases-by-mandal' + qs(params)),
+  exportCycleCsvUrl: (params) => `${BASE}/api/analytics/export-cycle.csv${qs(params)}`,
   // Generic helpers for role-specific endpoints (officer workflows, admin). Path starts with /api/...
   get: (path, params) => request(path + qs(params || {})),
   post: (path, body) => request(path, { method: 'POST', body: body ?? {} }),
+  postForm: (path, form) => request(path, { method: 'POST', form }),
   patch: (path, body) => request(path, { method: 'PATCH', body: body ?? {} }),
   put: (path, body) => request(path, { method: 'PUT', body: body ?? {} }),
   del: (path) => request(path, { method: 'DELETE' }),
+}
+
+export function toFormData(obj) {
+  if (obj instanceof FormData) return obj
+  const fd = new FormData()
+  if (!obj) return fd
+  for (const [k, v] of Object.entries(obj)) {
+    if (v !== undefined && v !== null) {
+      if (Array.isArray(v)) {
+        v.forEach((item) => fd.append(k, item))
+      } else {
+        fd.append(k, v)
+      }
+    }
+  }
+  return fd
 }

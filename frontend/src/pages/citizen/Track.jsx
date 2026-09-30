@@ -13,18 +13,41 @@ import { CHANNEL_LABEL, LANG_NAMES, date, fmt, money } from '../../lib/format'
 
 const DEMO_IDS = ['JS-IN-LAKSH1', 'JS-IN-RAMES1', 'JS-IN-SUNIT1', 'JS-IN-PRIYA1']
 const STEPS = [
-  { label: 'Received', Icon: Inbox, events: ['Request received'] },
-  { label: 'Grouped with neighbours', Icon: Users, events: ['Joined a demand cluster'] },
-  { label: 'In government plan', Icon: ClipboardList, events: ['Included in a project'] },
-  { label: 'Work started', Icon: Hammer, events: ['Department reported action'] },
-  { label: 'Fixed? You confirm', Icon: ThumbsUp, events: ['Citizen verification'] },
+  { label: 'Submitted', Icon: Inbox, events: ['Request received', 'Submitted by Citizen'] },
+  { label: 'Verified & Assigned', Icon: Users, events: ['Joined a demand cluster', 'Verified by Department Head', 'Assigned to Field Officer'] },
+  { label: 'Site Inspected & Budget Proposal', Icon: ClipboardList, events: ['Site Inspection & Budget Requested', 'Forwarded to District Collector'] },
+  { label: 'Budget Approved & Work Started', Icon: Hammer, events: ['Budget Approved & Allocated', 'Negotiation Accepted & Budget Allocated', 'Work Started'] },
+  { label: 'Work Completed (Proof Uploaded)', Icon: CheckCircle2, events: ['Work Done (Proof Submitted)', 'Resolution proof submitted'] },
+  { label: 'Fixed? Citizen Confirms', Icon: ThumbsUp, events: ['Citizen verification', 'Closed (Confirmed Fixed by Citizen)'] },
 ]
-const BASE_STAGE = { received: 0, needs_review: 0, clustered: 1, in_plan: 2, in_progress: 3, resolved_pending_verification: 4, reopened: 4, closed: 5 }
+
+const CYCLE_STAGE = {
+  SUBMITTED: 0,
+  received: 0,
+  needs_review: 0,
+  VERIFIED: 1,
+  ASSIGNED: 1,
+  clustered: 1,
+  in_plan: 2,
+  BUDGET_REQUESTED: 2,
+  SENT_TO_COLLECTOR: 2,
+  NEGOTIATION: 2,
+  ALLOCATED: 3,
+  in_progress: 3,
+  WORK_DONE: 4,
+  resolved_pending_verification: 4,
+  CLOSED: 5,
+  closed_verified: 5,
+  closed: 5,
+  REOPENED: 4,
+  reopened: 4,
+  REJECTED: 1,
+}
 
 function stageOf(r, project) {
-  let s = BASE_STAGE[r.status] ?? 0
+  let s = CYCLE_STAGE[r.status] ?? 0
   if (project) {
-    if (['approved', 'sanctioned', 'planned'].includes(project.status)) s = Math.max(s, 2)
+    if (['approved', 'sanctioned', 'planned'].includes(project.status)) s = Math.max(s, 3)
     if (project.status === 'in_progress') s = Math.max(s, 3)
     if (project.status === 'completed') s = Math.max(s, 4)
   }
@@ -35,12 +58,13 @@ function Stepper({ data }) {
   const t = useT()
   const r = data.request
   const stage = stageOf(r, data.project)
-  const reopened = r.status === 'reopened'
+  const reopened = r.status === 'REOPENED' || r.status === 'reopened'
+  const isRejected = r.status === 'REJECTED'
   const when = (st) => {
-    const e = data.timeline.filter((x) => st.events.includes(x.event)).pop()
+    const e = (data.timeline || []).filter((x) => st.events.includes(x.event)).pop()
     return e?.at ? date(e.at) : ''
   }
-  const nowLabel = stage >= 5 ? t('Fixed. You confirmed it.') : reopened ? t('You said it is not fixed. It is open again.') : t(STEPS[stage].label)
+  const nowLabel = stage >= 5 ? t('Fixed. You confirmed it.') : reopened ? t('You said it is not fixed. It is open again.') : isRejected ? t('Proposal Rejected') : t(STEPS[stage]?.label || r.status)
   return (
     <div className="stack">
       <ol className="cz-stepper" aria-label={t('Progress')}>
@@ -55,8 +79,8 @@ function Stepper({ data }) {
           )
         })}
       </ol>
-      <div className={`alert ${stage >= 5 ? 'alert-success' : reopened ? 'alert-danger' : 'alert-info'} mt`} role="status">
-        {stage >= 5 ? <CheckCircle2 size={20} aria-hidden="true" /> : reopened ? <AlertTriangle size={20} aria-hidden="true" /> : <Inbox size={20} aria-hidden="true" />}
+      <div className={`alert ${stage >= 5 ? 'alert-success' : reopened || isRejected ? 'alert-danger' : 'alert-info'} mt`} role="status">
+        {stage >= 5 ? <CheckCircle2 size={20} aria-hidden="true" /> : reopened || isRejected ? <AlertTriangle size={20} aria-hidden="true" /> : <Inbox size={20} aria-hidden="true" />}
         <div className="row-between" style={{ flex: 1, gap: 8 }}>
           <strong>{t('Now')}: {nowLabel}</strong>
           <ListenButton text={`${t('Now')}: ${nowLabel}`} />
@@ -103,10 +127,36 @@ export default function Track() {
   useEffect(() => { setMsg(null); if (tid) load(tid) }, [tid])
   const refresh = () => api.track(data.request.tracking_id).then(setData).catch(() => {})
 
+  const [disputeOpen, setDisputeOpen] = useState(false)
+  const [disputeReason, setDisputeReason] = useState('')
+
+  const confirmCycleFix = async (fixed) => {
+    if (!fixed && !disputeOpen) {
+      setDisputeOpen(true)
+      return
+    }
+    setLoading(true)
+    setError(null)
+    try {
+      await api.citizenConfirmCycle(data.request.tracking_id, {
+        fixed: fixed,
+        confirmed: fixed,
+        rating: fixed ? 5 : 1,
+        dispute_reason: disputeReason,
+        comment: disputeReason,
+      })
+      setMsg(fixed ? t('Thank you! Your confirmation has closed this grievance.') : t('Your dispute has been recorded. Case reopened for re-inspection.'))
+      setDisputeOpen(false)
+      load(data.request.tracking_id)
+    } catch (e) {
+      setError(e)
+    } finally {
+      setLoading(false)
+    }
+  }
+
   const verify = async (fixed) => {
-    const res = await api.verify(data.request.tracking_id, { fixed, rating: fixed ? 5 : 1 })
-    setMsg(res.message)
-    load(data.request.tracking_id)
+    return confirmCycleFix(fixed)
   }
   const erase = async () => {
     if (!window.confirm(t('Delete your personal data from this request? Only an anonymous count will stay.'))) return
@@ -178,20 +228,127 @@ export default function Track() {
             </div>
           )}
 
-          {r.status === 'resolved_pending_verification' && (
-            <div className="card highlight">
+          {['WORK_DONE', 'resolved_pending_verification'].includes(r.status) && (
+            <div className="card highlight" style={{ border: '2px solid var(--color-primary)' }}>
               <h2>{t('The office says the work is done. Is it really fixed?')}</h2>
               {r.closure_note && <p className="quote small">{r.closure_note}</p>}
-              {r.closure_flag === 'formulaic_closure' && (
-                <div className="alert alert-warn mt"><AlertTriangle size={18} aria-hidden="true" />
-                  <div className="small">{t('Careful: this reply does not say what work was done. It stays open until you say yes.')}</div></div>
+              {disputeOpen ? (
+                <div className="stack mt">
+                  <label htmlFor="dispute-why" className="small font-semibold">{t('Please explain what is still not fixed:')}</label>
+                  <textarea
+                    id="dispute-why"
+                    className="textarea"
+                    rows={2}
+                    value={disputeReason}
+                    onChange={(e) => setDisputeReason(e.target.value)}
+                    placeholder={t('E.g. Water is still leaking from the main pipe.')}
+                  />
+                  <div className="row">
+                    <button className="btn btn-danger btn-lg" disabled={disputeReason.trim().length < 4} onClick={() => confirmCycleFix(false)}>
+                      <XCircle size={18} aria-hidden="true" />
+                      {t('Submit Dispute (Reopen Case)')}
+                    </button>
+                    <button className="btn" onClick={() => setDisputeOpen(false)}>{t('Cancel')}</button>
+                  </div>
+                </div>
+              ) : (
+                <div className="cz-fix mt">
+                  <button className="btn btn-success btn-lg" onClick={() => confirmCycleFix(true)}>
+                    <CheckCircle2 size={24} aria-hidden="true" />
+                    {t('Yes, fixed')}
+                  </button>
+                  <button className="btn btn-danger btn-lg" onClick={() => confirmCycleFix(false)}>
+                    <XCircle size={24} aria-hidden="true" />
+                    {t('No, not fixed')}
+                  </button>
+                </div>
               )}
-              <div className="cz-fix mt">
-                <button className="btn btn-success btn-lg" onClick={() => verify(true)}><CheckCircle2 size={24} aria-hidden="true" />{t('Yes, fixed')}</button>
-                <button className="btn btn-danger btn-lg" onClick={() => verify(false)}><XCircle size={24} aria-hidden="true" />{t('No, not fixed')}</button>
-              </div>
             </div>
           )}
+
+          {/* Photos Evidence & Costed Budget */}
+          <section className="card" aria-label={t('Evidence & Budget')}>
+            <h3 style={{ margin: '0 0 12px' }}>{t('Photos Evidence & Costed Budget')}</h3>
+            <div className="grid g-2">
+              {/* Citizen Before Photos */}
+              <div>
+                <h4 className="small muted" style={{ margin: '0 0 8px' }}>{t('Before Photos (Citizen)')}</h4>
+                <div className="row" style={{ gap: 8, flexWrap: 'wrap' }}>
+                  {(r.photos && r.photos.length > 0 ? r.photos : [r.photo_path || '/sample_photos/pipe_broken.svg']).map((p, i) => (
+                    <img key={i} src={p} alt={t('Before')} style={{ width: 130, height: 95, objectFit: 'cover', borderRadius: 8, border: '1px solid #e2e8f0' }} />
+                  ))}
+                </div>
+              </div>
+
+              {/* Field Officer Site Inspection Photos */}
+              <div>
+                <h4 className="small muted" style={{ margin: '0 0 8px' }}>{t('Site Inspection Photos (Field Officer)')}</h4>
+                {r.site_photos && r.site_photos.length > 0 ? (
+                  <div className="row" style={{ gap: 8, flexWrap: 'wrap' }}>
+                    {r.site_photos.map((p, i) => (
+                      <img key={i} src={p} alt={t('Site Inspection')} style={{ width: 130, height: 95, objectFit: 'cover', borderRadius: 8, border: '1px solid #e2e8f0' }} />
+                    ))}
+                  </div>
+                ) : (
+                  <p className="small muted">{t('Awaiting field site inspection')}</p>
+                )}
+                {r.inspection_lat && (
+                  <div className="xs mono muted mt">GPS: {r.inspection_lat}, {r.inspection_lng}</div>
+                )}
+                {r.inspection_notes && (
+                  <p className="small quote mt" style={{ margin: '6px 0 0' }}>{r.inspection_notes}</p>
+                )}
+              </div>
+            </div>
+
+            {/* Costed Budget Line Items */}
+            {r.budget_line_items && r.budget_line_items.length > 0 && (
+              <div className="mt" style={{ borderTop: '1px solid #e2e8f0', paddingTop: 14 }}>
+                <div className="row-between" style={{ marginBottom: 8 }}>
+                  <h4 className="small muted" style={{ margin: 0 }}>{t('Costed Budget Line Items')}</h4>
+                  <span className="mono" style={{ fontWeight: 700, color: 'var(--color-primary)' }}>
+                    {t('Requested')}: ₹{Number(r.budget_requested || 0).toLocaleString('en-IN')}
+                    {r.budget_allocated ? ` · ${t('Allocated')}: ₹${Number(r.budget_allocated).toLocaleString('en-IN')}` : ''}
+                  </span>
+                </div>
+                <div style={{ overflowX: 'auto' }}>
+                  <table className="table" style={{ width: '100%', fontSize: '0.88rem' }}>
+                    <thead>
+                      <tr>
+                        <th>{t('Item Description')}</th>
+                        <th>{t('Quantity')}</th>
+                        <th>{t('Unit Cost')}</th>
+                        <th>{t('Total (₹)')}</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {r.budget_line_items.map((li, idx) => (
+                        <tr key={idx}>
+                          <td>{li.item}</td>
+                          <td>{li.quantity} {li.unit || ''}</td>
+                          <td>₹{Number(li.unit_cost || 0).toLocaleString('en-IN')}</td>
+                          <td className="mono font-semibold">₹{Number(li.total || 0).toLocaleString('en-IN')}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+
+            {/* Completion Photos */}
+            {r.completion_photos && r.completion_photos.length > 0 && (
+              <div className="mt" style={{ borderTop: '1px solid #e2e8f0', paddingTop: 14 }}>
+                <h4 className="small muted" style={{ margin: '0 0 8px' }}>{t('Work Completion Photos')}</h4>
+                <div className="row" style={{ gap: 8, flexWrap: 'wrap' }}>
+                  {r.completion_photos.map((p, i) => (
+                    <img key={i} src={p} alt={t('Work Completion')} style={{ width: 140, height: 100, objectFit: 'cover', borderRadius: 8, border: '2px solid #22c55e' }} />
+                  ))}
+                </div>
+                {r.closure_note && <p className="small quote mt" style={{ margin: '6px 0 0' }}>{r.closure_note}</p>}
+              </div>
+            )}
+          </section>
 
           <div className="grid g-2">
             <Card title="What you said">

@@ -182,12 +182,18 @@ export default function Report() {
   const t = useT()
   const [tab, setTab] = useState('individual')
   const [text, setText] = useState('')
-  const [picked, setPicked] = useState(null)
+  const [picked, setPicked] = useState('water')
   const [speakLang, setSpeakLang] = useState(uiLang)
   const [audio, setAudio] = useState(null)
   const [photo, setPhoto] = useState(null)
+  const [photos, setPhotos] = useState([])
   const [coords, setCoords] = useState(null)
   const [areaId, setAreaId] = useState('')
+  const [hierarchy, setHierarchy] = useState(null)
+  const [selState, setSelState] = useState('Telangana')
+  const [selDistrict, setSelDistrict] = useState('Adilabad')
+  const [selMandal, setSelMandal] = useState('Utnoor')
+  const [selVillage, setSelVillage] = useState('Birsaidpet')
   const [anonymous, setAnonymous] = useState(false)
   const [assisted, setAssisted] = useState(false)
   const [helper, setHelper] = useState('')
@@ -208,6 +214,59 @@ export default function Report() {
   const whereRef = useRef(null)
 
   const saveOutbox = (list) => { setOutbox(list); try { localStorage.setItem('js_outbox', JSON.stringify(list)) } catch { /* ignore */ } }
+
+  useEffect(() => {
+    api.geoHierarchy().then((data) => {
+      setHierarchy(data)
+      if (data?.states?.Telangana) {
+        setSelState('Telangana')
+        const dists = Object.keys(data.states.Telangana.districts || {})
+        if (dists.length > 0) {
+          const d = dists[0]
+          setSelDistrict(d)
+          const mnds = Object.keys(data.states.Telangana.districts[d]?.mandals || {})
+          if (mnds.length > 0) {
+            const m = mnds[0]
+            setSelMandal(m)
+            const vills = data.states.Telangana.districts[d]?.mandals[m] || []
+            if (vills.length > 0) setSelVillage(vills[0])
+          }
+        }
+      }
+    }).catch(() => {})
+  }, [])
+
+  const handleStateChange = (st) => {
+    setSelState(st)
+    const dists = Object.keys(hierarchy?.states?.[st]?.districts || {})
+    const d = dists[0] || 'Adilabad'
+    setSelDistrict(d)
+    const mnds = Object.keys(hierarchy?.states?.[st]?.districts?.[d]?.mandals || {})
+    const m = mnds[0] || 'Utnoor'
+    setSelMandal(m)
+    const vills = hierarchy?.states?.[st]?.districts?.[d]?.mandals?.[m] || []
+    setSelVillage(vills[0] || 'Birsaidpet')
+  }
+
+  const handleDistrictChange = (d) => {
+    setSelDistrict(d)
+    const mnds = Object.keys(hierarchy?.states?.[selState]?.districts?.[d]?.mandals || {})
+    const m = mnds[0] || ''
+    setSelMandal(m)
+    const vills = hierarchy?.states?.[selState]?.districts?.[d]?.mandals?.[m] || []
+    setSelVillage(vills[0] || '')
+  }
+
+  const handleMandalChange = (m) => {
+    setSelMandal(m)
+    const vills = hierarchy?.states?.[selState]?.districts?.[selDistrict]?.mandals?.[m] || []
+    setSelVillage(vills[0] || '')
+  }
+
+  const handleVillageChange = (v) => {
+    setSelVillage(v)
+  }
+
   // Offline-first: requests typed without a connection are kept on the phone and sent automatically later.
   useEffect(() => {
     const flush = async () => {
@@ -268,6 +327,11 @@ export default function Report() {
     try {
       const f = new FormData()
       f.append('text', text)
+      f.append('state', selState || 'Telangana')
+      f.append('district', selDistrict || 'Adilabad')
+      f.append('mandal', selMandal || 'Utnoor')
+      f.append('village', selVillage || 'Birsaidpet')
+      f.append('category', picked || 'water')
       f.append('channel', assisted ? 'assisted' : 'web')
       if (coords) { f.append('lat', coords.lat); f.append('lng', coords.lng) }
       if (areaId) f.append('area_id', areaId)
@@ -277,8 +341,12 @@ export default function Report() {
       if (assisted && helper) f.append('assisted_by', helper)
       if (!text && speakLang) f.append('language', speakLang)
       if (audio) f.append('audio', audio, 'voice.webm')
-      if (photo) f.append('photo', photo, photo.name)
-      const res = await api.intakeForm(f)
+      if (photos.length > 0) {
+        photos.forEach((p) => f.append('photos', p, p.name))
+      } else if (photo) {
+        f.append('photos', photo, photo.name)
+      }
+      const res = await api.cycleIntake(f)
       setResult(res)
       window.scrollTo?.(0, 0)
       try { localStorage.setItem('js_last_tid', res.tracking_id) } catch { /* ignore */ }
@@ -357,21 +425,69 @@ export default function Report() {
 
             <section className="card" aria-labelledby="st2" ref={whereRef} style={{ scrollMarginTop: 90 }}>
               <div id="st2"><StepHead n={2}>{t('Where?')}</StepHead></div>
-              <div className="grid g-2" style={{ alignItems: 'end' }}>
+              <p className="small muted" style={{ marginTop: 2, marginBottom: 12 }}>
+                {t('Choose State → District → Mandal → Village')}
+              </p>
+              <div className="grid g-2">
                 <div className="field">
-                  <label htmlFor="area">{t('Choose your village or ward')}</label>
-                  <select id="area" className="select" value={areaId} onChange={(e) => setAreaId(e.target.value)} style={{ minHeight: 48 }}>
-                    <option value="">—</option>
-                    <AreaOptions grouped={grouped} />
+                  <label htmlFor="sel-state">{t('State')}</label>
+                  <select id="sel-state" className="select" value={selState} onChange={(e) => handleStateChange(e.target.value)} style={{ minHeight: 46 }}>
+                    {hierarchy ? Object.keys(hierarchy.states || {}).map((s) => (
+                      <option key={s} value={s}>{t(s)}</option>
+                    )) : <option value="Telangana">{t('Telangana')}</option>}
                   </select>
                 </div>
-                <div className="stack">
-                  <button type="button" className="btn btn-lg" onClick={locate}><Crosshair size={18} aria-hidden="true" />{coords ? t('Location found') : t('Use my location')}</button>
+                <div className="field">
+                  <label htmlFor="sel-dist">{t('District')}</label>
+                  <select id="sel-dist" className="select" value={selDistrict} onChange={(e) => handleDistrictChange(e.target.value)} style={{ minHeight: 46 }}>
+                    {hierarchy && hierarchy.states?.[selState] ? (
+                      Object.keys(hierarchy.states[selState].districts || {}).map((d) => (
+                        <option key={d} value={d}>{t(d)}</option>
+                      ))
+                    ) : (
+                      <>
+                        <option value="Adilabad">{t('Adilabad')}</option>
+                        <option value="Hyderabad">{t('Hyderabad')}</option>
+                      </>
+                    )}
+                  </select>
+                </div>
+                <div className="field">
+                  <label htmlFor="sel-mandal">{t('Mandal')}</label>
+                  <select id="sel-mandal" className="select" value={selMandal} onChange={(e) => handleMandalChange(e.target.value)} style={{ minHeight: 46 }}>
+                    {hierarchy && hierarchy.states?.[selState]?.districts?.[selDistrict] ? (
+                      Object.keys(hierarchy.states[selState].districts[selDistrict].mandals || {}).map((m) => (
+                        <option key={m} value={m}>{m} {t('mandal')}</option>
+                      ))
+                    ) : (
+                      <option value="Utnoor">Utnoor {t('mandal')}</option>
+                    )}
+                  </select>
+                </div>
+                <div className="field">
+                  <label htmlFor="sel-village">{t('Village / Ward')}</label>
+                  <select id="sel-village" className="select" value={selVillage} onChange={(e) => handleVillageChange(e.target.value)} style={{ minHeight: 46 }}>
+                    {hierarchy && hierarchy.states?.[selState]?.districts?.[selDistrict]?.mandals?.[selMandal] ? (
+                      (hierarchy.states[selState].districts[selDistrict].mandals[selMandal] || []).map((v) => (
+                        <option key={v} value={v}>{v}</option>
+                      ))
+                    ) : (
+                      <option value="Birsaidpet">Birsaidpet</option>
+                    )}
+                  </select>
                 </div>
               </div>
-              {selArea && <p className="small mt row" style={{ gap: 6 }}><MapPin size={16} aria-hidden="true" /><strong>{selArea.name}</strong> · {t(selArea.district)}, {t(selArea.state)}</p>}
-              {coords && !selArea && <p className="help mono mt">{coords.lat.toFixed(4)}, {coords.lng.toFixed(4)}</p>}
-              <p className="help mt">{t('Not in the list? Just say the place name in your message.')}</p>
+
+              <div className="row mt" style={{ alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+                <span className="small muted">
+                  <MapPin size={16} aria-hidden="true" style={{ verticalAlign: 'middle', marginRight: 4, color: 'var(--color-primary)' }} />
+                  <strong>{selVillage}</strong> · {selMandal} {t('mandal')}, {t(selDistrict)}, {t(selState)}
+                </span>
+                <button type="button" className="btn" onClick={locate}>
+                  <Crosshair size={16} aria-hidden="true" />
+                  {coords ? t('Location found') : t('Use my location')}
+                </button>
+              </div>
             </section>
 
             {nearby.length > 0 && (
@@ -392,9 +508,31 @@ export default function Report() {
             <section className="card" aria-labelledby="st3">
               <div id="st3"><StepHead n={3}>{t('Send')}</StepHead></div>
               <div className="field">
-                <label htmlFor="photo" className="btn" style={{ width: 'fit-content', cursor: 'pointer' }}><Camera size={18} aria-hidden="true" />{photo ? t('Photo added') : t('Add a photo (optional)')}</label>
-                <input id="photo" type="file" accept="image/*" capture="environment" className="sr-only" onChange={(e) => setPhoto(e.target.files?.[0] || null)} />
-                {photo && <span className="help">{photo.name}</span>}
+                <label htmlFor="photos-input" className="btn btn-lg" style={{ width: 'fit-content', cursor: 'pointer' }}>
+                  <Camera size={18} aria-hidden="true" />
+                  {photos.length > 0 ? t('{n} photos chosen', { n: photos.length }) : t('Upload photos')}
+                </label>
+                <input
+                  id="photos-input"
+                  type="file"
+                  accept="image/*"
+                  multiple
+                  className="sr-only"
+                  onChange={(e) => {
+                    const files = Array.from(e.target.files || [])
+                    setPhotos(files)
+                    if (files[0]) setPhoto(files[0])
+                  }}
+                />
+                {photos.length > 0 && (
+                  <div className="row mt" style={{ gap: 8, flexWrap: 'wrap' }}>
+                    {photos.map((p, idx) => (
+                      <span key={idx} className="badge" style={{ padding: '6px 10px', background: '#f1f5f9', borderRadius: 8 }}>
+                        📷 {p.name}
+                      </span>
+                    ))}
+                  </div>
+                )}
               </div>
               <details className="cz-more mt">
                 <summary><SlidersHorizontal size={18} aria-hidden="true" />{t('More options (optional)')}</summary>

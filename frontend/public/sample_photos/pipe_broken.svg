@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 400" width="100%" height="100%">
+  <rect width="600" height="400" fill="#334155"/>
+  <rect y="260" width="600" height="140" fill="#1e293b"/>
+  <!-- Broken Water Pipe -->
+  <path d="M 0 200 L 250 200" stroke="#94a3b8" stroke-width="48" stroke-linecap="round"/>
+  <path d="M 330 220 L 600 200" stroke="#94a3b8" stroke-width="48" stroke-linecap="round"/>
+  <!-- Crack and gushing water -->
+  <path d="M 230 190 Q 290 140 310 90 Q 330 150 350 210" fill="none" stroke="#38bdf8" stroke-width="12" stroke-dasharray="10 5"/>
+  <circle cx="300" cy="130" r="45" fill="#0284c7" opacity="0.6"/>
+  <circle cx="280" cy="100" r="30" fill="#38bdf8" opacity="0.7"/>
+  <circle cx="330" cy="110" r="35" fill="#bae6fd" opacity="0.8"/>
+  <text x="30" y="50" font-family="sans-serif" font-size="22" font-weight="bold" fill="#f87171">BEFORE: Major Water Pipe Rupture</text>
+  <text x="30" y="80" font-family="sans-serif" font-size="16" fill="#cbd5e1">Utnoor Mandal · 50mm Main Line Leakage</text>
+  <rect x="420" y="25" width="150" height="34" rx="6" fill="#ef4444"/>
+  <text x="440" y="48" font-family="sans-serif" font-size="14" font-weight="bold" fill="#ffffff">SITE INSPECTION</text>
+</svg>

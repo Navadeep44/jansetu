@@ -39,14 +39,63 @@ route them as tickets. What is missing is the next layer: turning those voices i
   shows all their requests (in demo mode the code is shown on screen).
 - **Officials log in.** Demo accounts (also shown on the login page):
 
-| Username / password | Role | Persona |
-|---|---|---|
-| `officer` / `officer123` | Field officer (`field_officer`) | Ravi Teja, Utnoor block |
-| `collector` / `collector123` | District (`district`) | Anitha Rao, Collector, Adilabad |
-| `state` / `state123` | State planner (`state`) | K. Srinivas, State Planning Dept, Telangana |
-| `planner` / `planner123` | National planner (`national`) | Dr. S. Menon, NITI Aayog / MoRD |
+### Demo Accounts Directory
 
-Tokens are HMAC-signed and expire after 12 hours. In production, replace the login function with government single sign-on.
+| Role | Officer Name | Jurisdiction | Username / Password |
+|---|---|---|---|
+| **State Admin** | K. Chandrasekhar Reddy | Telangana State | `state_telangana` / `state123` |
+| **District Collector** | Anitha Rao, IAS | Adilabad District | `collector_adilabad` / `district123` |
+| **District Collector** | K. Shashank, IAS | Hyderabad District | `collector_hyderabad` / `district123` |
+| **Department Head** | Er. P. Venkatesh | Water Supply · Adilabad | `dept_water_adi` / `dept123` |
+| **Department Head** | Er. K. Suresh | Roads & Buildings · Adilabad | `dept_roads_adi` / `dept123` |
+| **Department Head** | Er. T. Satyanarayana | Electricity (TSNPDCL) · Adilabad | `dept_power_adi` / `dept123` |
+| **Department Head** | Dr. M. Sailaja | Sanitation · Adilabad | `dept_sanitation_adi` / `dept123` |
+| **Field Officer** | Ravi Teja | Water · Utnoor mandal · Adilabad | `field_utnoor` / `field123` |
+| **Field Officer** | M. Prakash | Roads · Utnoor mandal · Adilabad | `field_roads_utnoor` / `field123` |
+| **Field Officer** | V. Naresh | Water · Jainoor mandal · Adilabad | `field_jainoor` / `field123` |
+| **Citizen** | Public Citizen | India-wide (No login required) | Direct submission or OTP: `123456` |
+
+Tokens are HMAC-signed and expire after 24 hours. In production, replace the login function with government single sign-on (Parichay).
+
+---
+
+## Grievance-to-Budget Cycle
+
+JanSetu implements a closed-loop grievance-to-budget delivery workflow connecting citizens directly to local execution and fiscal sanctions without paperwork bottlenecks:
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor Citizen
+    actor DH as Department Head (District)
+    actor FO as Field Officer (Mandal)
+    actor Coll as District Collector
+
+    Note over Citizen,Coll: Stage 1: Grievance Intake
+    Citizen->>DH: 1. Submits grievance with photos & GPS (SUBMITTED)
+    Note over DH,FO: Stage 2: Verification & Assignment
+    DH->>FO: 2. Verifies issue & assigns to mandal FO (ASSIGNED)
+    Note over FO,DH: Stage 3: Field Inspection & Budgeting
+    FO->>DH: 3. Site inspection (GPS, photos) + Line items in ₹ (BUDGET_REQUESTED)
+    Note over DH,Coll: Stage 4: Department Head Review
+    DH->>Coll: 4. Reviews line items & forwards case dossier (SENT_TO_COLLECTOR)
+    Note over Coll,DH: Stage 5: Collector Sanction & Negotiation
+    Coll->>DH: 5. Negotiates counter-offer against district SSR rates (NEGOTIATION)
+    DH->>Coll: Accepts counter-offer
+    Coll->>FO: Approves & allocates funds to case wallet (ALLOCATED)
+    Note over FO,DH: Stage 6: Field Execution & Spend Log
+    FO->>DH: 6. Executes work, logs expenses (spend ≤ alloc), uploads completion photos (WORK_DONE)
+    Note over DH,Citizen: Stage 7: Department Audit & Citizen Confirmation
+    DH->>Citizen: 7. Approves completion proof (ACCEPT)
+    Citizen->>DH: 8. Confirms "Fixed" (CLOSED) or disputes "Not fixed" (REOPENED)
+```
+
+### Cycle SLA Timelines & Safeguards
+- **SLA Benchmarks:** Verification in 2 days, site inspection in 5 days, Collector decision in 7 days, execution in 14 days.
+- **Strict Jurisdiction Boundaries:** Every API query and transaction verifies the officer's jurisdiction (`state`, `district`, `mandal`, `department`). Unauthorized cross-jurisdiction access returns HTTP 403.
+- **Hard Fiscal Envelope:** Field officer wallet spend is bounded strictly by `budget_allocated`. Spending more than sanctioned funds returns HTTP 422.
+- **Multilingual Transparency:** Every status change alerts both the next official and the citizen in their preferred language (English, Hindi, Telugu).
+
 
 ## Main screens
 

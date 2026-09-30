@@ -8,7 +8,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
 from app.api.routes import (
-    admin, analytics, auth, channels, clusters, connectors,
+    admin, analytics, auth, channels, clusters, connectors, cycle,
     governance, insights, intake, meta, officer, open311, projects, public, requests
 )
 from app.core.config import settings
@@ -44,9 +44,17 @@ app = FastAPI(
 app.add_middleware(CORSMiddleware, allow_origins=[o.strip() for o in settings.cors_origins.split(",")] + ["*"],
                    allow_credentials=False, allow_methods=["*"], allow_headers=["*"])
 
-for r in (auth, admin, officer, governance, meta, public, intake, requests, clusters, analytics, projects, insights, connectors, channels):
+for r in (auth, admin, officer, governance, meta, public, intake, requests, clusters, analytics, projects, insights, connectors, channels, cycle):
     app.include_router(r.router, prefix="/api")
 app.include_router(open311.router)
+
+_static_photos = Path(__file__).resolve().parent / "static" / "photos"
+if _static_photos.exists():
+    app.mount("/sample_photos", StaticFiles(directory=_static_photos), name="sample_photos")
+
+_media = Path("media")
+if _media.exists():
+    app.mount("/media", StaticFiles(directory=_media), name="media")
 
 
 class SPAStaticFiles(StaticFiles):

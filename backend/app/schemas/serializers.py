@@ -81,9 +81,35 @@ def request_out(r: CitizenRequest, full: bool = False) -> dict:
         "closure_note": r.closure_note, "closure_flag": r.closure_flag,
         "citizen_verified": r.citizen_verified, "citizen_rating": r.citizen_rating,
         "dispute_reason": r.dispute_reason, "dispute_photo_path": r.dispute_photo_path, "proof_count": r.proof_count,
-        "has_audio": bool(r.audio_path), "has_photo": bool(r.photo_path), "created_at": iso(r.created_at), "closed_at": iso(r.closed_at),
+        "has_audio": bool(r.audio_path), "has_photo": bool(r.photo_path or (r.photos and len(r.photos) > 0)),
+        "created_at": iso(r.created_at), "closed_at": iso(r.closed_at),
         "waiting_for": ("location" if "needs_location" in (r.flags or []) else
                         "details" if r.category == "other" and r.status == "needs_review" else None),
+        # Hierarchy fields
+        "mandal": getattr(r, "mandal", "") or r.block or (getattr(r.area, "mandal", "") if r.area else "") or (r.area.name if r.area else ""),
+        "village": getattr(r, "village", "") or (getattr(r.area, "village", "") if r.area else "") or (r.area.name if r.area else ""),
+        # Photos
+        "photos": getattr(r, "photos", []) or ([r.photo_path] if r.photo_path else []),
+        "site_photos": getattr(r, "site_photos", []) or [],
+        "completion_photos": getattr(r, "completion_photos", []) or [],
+        # Inspection
+        "inspection_notes": getattr(r, "inspection_notes", "") or "",
+        "inspection_lat": getattr(r, "inspection_lat", None),
+        "inspection_lng": getattr(r, "inspection_lng", None),
+        "inspection_at": iso(getattr(r, "inspection_at", None)),
+        # Budget cycle
+        "budget_requested": getattr(r, "budget_requested", 0.0) or 0.0,
+        "budget_approved": getattr(r, "budget_approved", 0.0) or 0.0,
+        "budget_allocated": getattr(r, "budget_allocated", 0.0) or 0.0,
+        "budget_spent": getattr(r, "budget_spent", 0.0) or 0.0,
+        "budget_line_items": getattr(r, "budget_line_items", []) or [],
+        "negotiation_history": getattr(r, "negotiation_history", []) or [],
+        "expenses": getattr(r, "expenses", []) or [],
+        "dh_forward_note": getattr(r, "dh_forward_note", "") or "",
+        "collector_note": getattr(r, "collector_note", "") or "",
+        "rejection_reason": getattr(r, "rejection_reason", "") or "",
+        "sla_stage": getattr(r, "sla_stage", "verify") or "verify",
+        "sla_breached": getattr(r, "sla_breached", False) or is_overdue,
     }
     if full:
         d["status_history"] = [status_history_out(sh) for sh in (r.status_history or [])]

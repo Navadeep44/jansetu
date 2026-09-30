@@ -102,6 +102,37 @@ class CitizenRequest(Base):
     in_progress_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     resolved_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
 
+    # State -> District -> Mandal -> Village hierarchy caching
+    state: Mapped[str] = mapped_column(String(80), default="", index=True)
+    district: Mapped[str] = mapped_column(String(80), default="", index=True)
+    mandal: Mapped[str] = mapped_column(String(80), default="", index=True)
+    village: Mapped[str] = mapped_column(String(120), default="", index=True)
+
+    # Photos across cycle
+    photos: Mapped[list] = mapped_column(JSON, default=list)  # initial citizen photos
+    site_photos: Mapped[list] = mapped_column(JSON, default=list)  # field officer inspection photos
+    completion_photos: Mapped[list] = mapped_column(JSON, default=list)  # field officer completion photos
+
+    # Inspection details
+    inspection_notes: Mapped[str] = mapped_column(Text, default="")
+    inspection_lat: Mapped[float | None] = mapped_column(Float, nullable=True)
+    inspection_lng: Mapped[float | None] = mapped_column(Float, nullable=True)
+    inspection_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+
+    # Budget & Negotiation lifecycle
+    budget_requested: Mapped[float] = mapped_column(Float, default=0.0)
+    budget_approved: Mapped[float] = mapped_column(Float, default=0.0)
+    budget_allocated: Mapped[float] = mapped_column(Float, default=0.0)
+    budget_spent: Mapped[float] = mapped_column(Float, default=0.0)
+    budget_line_items: Mapped[list] = mapped_column(JSON, default=list)
+    negotiation_history: Mapped[list] = mapped_column(JSON, default=list)
+    expenses: Mapped[list] = mapped_column(JSON, default=list)
+    dh_forward_note: Mapped[str] = mapped_column(Text, default="")
+    collector_note: Mapped[str] = mapped_column(Text, default="")
+    rejection_reason: Mapped[str] = mapped_column(Text, default="")
+    sla_stage: Mapped[str] = mapped_column(String(50), default="verify")
+    sla_breached: Mapped[bool] = mapped_column(Boolean, default=False)
+
     closure_note: Mapped[str] = mapped_column(Text, default="")
     closure_flag: Mapped[str] = mapped_column(String(40), default="")  # formulaic_closure | suspicious_proof
     citizen_verified: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
@@ -118,6 +149,25 @@ class CitizenRequest(Base):
     cluster = relationship("DemandCluster", back_populates="requests")
     status_history = relationship("StatusHistory", back_populates="request", cascade="all, delete-orphan", order_by="StatusHistory.created_at")
     proofs = relationship("ProofUpload", back_populates="request", cascade="all, delete-orphan", order_by="ProofUpload.uploaded_at")
+    case_expenses = relationship("CaseExpense", back_populates="request", cascade="all, delete-orphan", order_by="CaseExpense.created_at")
+
+
+class CaseExpense(Base):
+    """Immutable ledger of expenses logged against a case's allocated budget."""
+    __tablename__ = "case_expenses"
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    request_id: Mapped[int] = mapped_column(ForeignKey("requests.id"), index=True)
+    officer_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    officer_name: Mapped[str] = mapped_column(String(100), default="")
+    item: Mapped[str] = mapped_column(String(200))
+    amount: Mapped[float] = mapped_column(Float)
+    bill_reference: Mapped[str] = mapped_column(String(100), default="")
+    vendor_name: Mapped[str] = mapped_column(String(120), default="")
+    receipt_url: Mapped[str] = mapped_column(Text, default="")
+    expense_date: Mapped[str] = mapped_column(String(30), default="")
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+    request = relationship("CitizenRequest", back_populates="case_expenses")
 
 
 class Notification(Base):

@@ -1,166 +1,674 @@
-// Department officer: "Department queue" — cases of my department in my district.
-// New → assign to a field officer · Assigned → watch · Proof to check → accept or send back · Done.
-import { useMemo, useState } from 'react'
-import { Link } from 'react-router-dom'
-import { CheckCircle2, ClipboardList, Hammer, ImageOff, Inbox, Layers, Siren, Undo2, UserPlus, Users } from 'lucide-react'
+// Department Head: "Department queue"
+// Workflows:
+// 1. New (SUBMITTED) -> Verify or Reject with reason
+// 2. Verified (VERIFIED) -> Assign to field officer for that department & mandal
+// 3. Budget Requests (BUDGET_REQUESTED, NEGOTIATION) -> Forward to Collector, or respond to Collector counter-offer (Accept / Reply)
+// 4. Proof to check (WORK_DONE) -> Accept proof or send back for rework
+// 5. Team performance table: 1 row per field officer (open, overdue, allocated vs spent, avg days to close)
+import { useEffect, useMemo, useState } from 'react'
+import {
+  AlertCircle, AlertTriangle, ArrowRight, Award, Camera, CheckCircle2, ChevronDown,
+  ChevronUp, Clock, DollarSign, FileCheck, FileText, Forward, HelpCircle, Image as ImageIcon,
+  MapPin, MessageSquare, RefreshCw, Send, ShieldAlert, Siren, Undo2, UserCheck, UserPlus,
+  Users, Wallet, X, XCircle,
+} from 'lucide-react'
 import { api } from '../../api/client'
 import { useApp } from '../../context/AppContext'
 import { useT } from '../../i18n'
 import { jurisdictionText } from '../../lib/roles'
 import { useAsync } from '../../lib/useAsync'
-import { ErrorBox, Loading, PageHead, Tabs } from '../ui'
-import { date } from '../../lib/format'
-import { CaseHead, CountStrip, DONE, proofAccepted, toDate } from './shared'
+import { Badge, Card, ErrorBox, Loading, PageHead, Tabs } from '../ui'
+import { CaseHead, CountStrip, toDate } from './shared'
 
-const OPEN_WORK = ['assigned', 'in_progress', 'reopened', 'escalated']
-
-function AssignBox({ r, team, onDone }) {
+// 1. REJECT MODAL
+function RejectModal({ r, onDone, onCancel }) {
   const t = useT()
-  const [who, setWho] = useState(team.length === 1 ? String(team[0].id) : '')
-  const [err, setErr] = useState(null)
+  const [reason, setReason] = useState('')
   const [busy, setBusy] = useState(false)
-  const send = async () => {
-    setBusy(true); setErr(null)
-    try { await api.post(`/api/requests/${r.id}/assign`, { field_officer_id: Number(who) }); onDone() } catch (e) { setErr(e) } finally { setBusy(false) }
+  const [err, setErr] = useState(null)
+
+  const submitReject = async (e) => {
+    e.preventDefault()
+    if (!reason.trim()) return
+    setBusy(true)
+    setErr(null)
+    try {
+      await api.verifyHead(r.id, { action: 'reject', reason: reason.trim() })
+      onDone()
+    } catch (ex) {
+      setErr(ex)
+    } finally {
+      setBusy(false)
+    }
   }
-  if (!team.length) return <div className="xs muted mt">{t('No field officer in your team yet.')}</div>
+
   return (
-    <div className="row mt" style={{ alignItems: 'end' }}>
-      <div className="field" style={{ minWidth: 220, flex: '1 1 220px' }}><label htmlFor={`as-${r.id}`}>{t(r.assigned_field_officer_id ? 'Give to someone else' : 'Give to')}</label>
-        <select id={`as-${r.id}`} className="select" style={{ minHeight: 44 }} value={who} onChange={(e) => setWho(e.target.value)}>
-          <option value="">{t('Choose field officer')}</option>
-          {team.map((o) => <option key={o.id} value={o.id}>{o.name}{o.block ? ` · ${o.block}` : ''} · {t('{n} open', { n: o.open_workload })}</option>)}
-        </select></div>
-      <button type="button" className="btn btn-primary btn-lg" disabled={!who || busy || Number(who) === r.assigned_field_officer_id} onClick={send}><UserPlus size={18} aria-hidden="true" />{t('Assign')}</button>
+    <div className="card highlight mt" style={{ border: '2px solid #ef4444', background: '#fef2f2' }}>
+      <div className="row-between">
+        <h4 style={{ margin: 0, color: '#b91c1c' }}>{t('Reject Proposal')}</h4>
+        <button type="button" className="btn btn-sm" onClick={onCancel}><X size={14} /></button>
+      </div>
+      <form onSubmit={submitReject} className="stack mt">
+        <label htmlFor={`rej-${r.id}`} className="small">{t('Reason for Rejection (Citizen will be notified):')}</label>
+        <textarea
+          id={`rej-${r.id}`}
+          className="textarea"
+          rows={2}
+          value={reason}
+          onChange={(e) => setReason(e.target.value)}
+          placeholder={t('E.g. Duplicate grievance already being addressed under Mission Bhagiratha project.')}
+          required
+        />
+        <ErrorBox error={err} />
+        <div className="row">
+          <button type="submit" className="btn btn-danger" disabled={busy || !reason.trim()}>
+            <XCircle size={16} />
+            {busy ? t('Rejecting…') : t('Confirm Rejection')}
+          </button>
+          <button type="button" className="btn" onClick={onCancel}>{t('Cancel')}</button>
+        </div>
+      </form>
+    </div>
+  )
+}
+
+// 2. MANDAL-FILTERED ASSIGNMENT BOX
+function AssignBox({ r, onDone }) {
+  const t = useT()
+  const [officers, setOfficers] = useState([])
+  const [selectedFo, setSelectedFo] = useState('')
+  const [loading, setLoading] = useState(true)
+  const [busy, setBusy] = useState(false)
+  const [err, setErr] = useState(null)
+
+  useEffect(() => {
+    setLoading(true)
+    api.assignableOfficers({
+      district: r.district,
+      department: r.category,
+      mandal: r.mandal,
+    }).then((res) => {
+      const list = res.officers || []
+      setOfficers(list)
+      if (list.length > 0) setSelectedFo(String(list[0].id))
+    }).catch(() => {
+      setOfficers([])
+    }).finally(() => {
+      setLoading(false)
+    })
+  }, [r.district, r.category, r.mandal])
+
+  const submitAssign = async () => {
+    if (!selectedFo) return
+    setBusy(true)
+    setErr(null)
+    try {
+      await api.assignCycle(r.id, { field_officer_id: Number(selectedFo) })
+      onDone()
+    } catch (ex) {
+      setErr(ex)
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <div className="card mt" style={{ background: '#f8fafc', border: '1px solid #cbd5e1', padding: 12 }}>
+      <h4 style={{ margin: '0 0 6px' }}>{t('Assign Field Officer')} ({r.mandal} {t('mandal')})</h4>
+      {loading ? (
+        <span className="small muted">{t('Loading matching field officers…')}</span>
+      ) : officers.length === 0 ? (
+        <div className="alert alert-warn small">{t('No field officer registered for this department in {mandal}.', { mandal: r.mandal })}</div>
+      ) : (
+        <div className="row" style={{ alignItems: 'flex-end', gap: 8 }}>
+          <div className="field" style={{ flex: '1 1 240px' }}>
+            <label htmlFor={`fo-sel-${r.id}`} className="sr-only">{t('Field Officer')}</label>
+            <select
+              id={`fo-sel-${r.id}`}
+              className="select"
+              value={selectedFo}
+              onChange={(e) => setSelectedFo(e.target.value)}
+              style={{ minHeight: 42 }}
+            >
+              {officers.map((fo) => (
+                <option key={fo.id} value={fo.id}>
+                  {fo.name} ({fo.mandal} {t('mandal')}) · {fo.open_cases} {t('open')}
+                </option>
+              ))}
+            </select>
+          </div>
+          <button type="button" className="btn btn-primary" disabled={!selectedFo || busy} onClick={submitAssign}>
+            <UserCheck size={16} />
+            {busy ? t('Assigning…') : t('Assign')}
+          </button>
+        </div>
+      )}
       <ErrorBox error={err} />
     </div>
   )
 }
 
-function ProofReview({ item, onDone }) {
+// 3. FORWARD TO COLLECTOR MODAL
+function ForwardModal({ r, onDone, onCancel }) {
   const t = useT()
-  const r = item.request
-  const [back, setBack] = useState(false)
-  const [note, setNote] = useState('')
-  const [err, setErr] = useState(null)
+  const [note, setNote] = useState('Site inspection verified. SSR rates and cost estimate checked. Forwarded for administrative sanction.')
   const [busy, setBusy] = useState(false)
-  const decide = async (decision) => {
-    setBusy(true); setErr(null)
-    try { await api.post(`/api/requests/${r.id}/proof/review`, { decision, note: decision === 'rework' ? note.trim() : undefined }); onDone() } catch (e) { setErr(e) } finally { setBusy(false) }
+  const [err, setErr] = useState(null)
+
+  const submitForward = async (e) => {
+    e.preventDefault()
+    setBusy(true)
+    setErr(null)
+    try {
+      await api.forwardCollector(r.id, { forward_note: note.trim() })
+      onDone()
+    } catch (ex) {
+      setErr(ex)
+    } finally {
+      setBusy(false)
+    }
   }
-  const proofs = item.proofs || []
-  const last = proofs[proofs.length - 1]
-  const note0 = (r.status_history || []).filter((h) => h.stage_label?.startsWith('Resolved')).slice(-1)[0]?.note?.replace(/^Resolution proof submitted: /, '') || r.closure_note
+
   return (
-    <article className="card" style={{ boxShadow: 'none' }}>
-      <CaseHead r={r} />
-      <div className="grid g-2 mt" style={{ alignItems: 'start' }}>
-        <div>
-          {last?.file_url?.startsWith('data:') || last?.file_url?.startsWith('/') ? (
-            <img src={last.file_url} alt={t('Photo of the finished work')} style={{ width: '100%', maxHeight: 260, objectFit: 'cover', borderRadius: 10 }} />
-          ) : last ? (
-            <a href={last.file_url} target="_blank" rel="noreferrer" className="btn">{t('Open photo')}</a>
-          ) : (
-            <div className="empty row" style={{ justifyContent: 'center' }}><ImageOff size={18} aria-hidden="true" />{t('No photo was sent')}</div>
-          )}
+    <div className="card highlight mt" style={{ border: '2px solid var(--color-primary)', background: '#f8fafc' }}>
+      <div className="row-between">
+        <h4 style={{ margin: 0 }}>{t('Forward to District Collector')}</h4>
+        <button type="button" className="btn btn-sm" onClick={onCancel}><X size={14} /></button>
+      </div>
+
+      <div className="row small mt" style={{ gap: 14 }}>
+        <span>{t('Requested Budget')}: <strong className="mono font-bold">₹{Number(r.budget_requested || 0).toLocaleString('en-IN')}</strong></span>
+        <span>{t('Line Items')}: <strong>{r.budget_line_items?.length || 0}</strong></span>
+        <span>{t('Site Photos')}: <strong>{r.site_photos?.length || 0}</strong></span>
+      </div>
+
+      <form onSubmit={submitForward} className="stack mt">
+        <label htmlFor={`fwd-note-${r.id}`} className="small">{t('Department Head Forwarding Note:')}</label>
+        <textarea
+          id={`fwd-note-${r.id}`}
+          className="textarea"
+          rows={2}
+          value={note}
+          onChange={(e) => setNote(e.target.value)}
+          required
+        />
+        <ErrorBox error={err} />
+        <div className="row">
+          <button type="submit" className="btn btn-primary btn-lg" disabled={busy}>
+            <Forward size={18} />
+            {busy ? t('Forwarding…') : t('Forward with Evidence to Collector')}
+          </button>
+          <button type="button" className="btn" onClick={onCancel}>{t('Cancel')}</button>
         </div>
-        <div className="stack">
-          <div className="small"><strong>{t('What was done')}:</strong> {note0 || '—'}</div>
-          {last && <div className="xs muted">{last.officer_name} · {date(last.uploaded_at)}{last.lat ? ` · ${last.lat.toFixed(3)}, ${last.lng.toFixed(3)}` : ''}</div>}
-          {item.has_suspicious_proof && <div className="alert alert-warn"><Siren size={18} aria-hidden="true" /><div className="small">{t('This proof looks doubtful. Check before accepting.')}</div></div>}
-          {!back ? (
-            <div className="row">
-              <button type="button" className="btn btn-success btn-lg" disabled={busy} onClick={() => decide('accept')}><CheckCircle2 size={18} aria-hidden="true" />{t('Accept')}</button>
-              <button type="button" className="btn btn-lg" onClick={() => setBack(true)}><Undo2 size={18} aria-hidden="true" />{t('Send back')}</button>
+      </form>
+    </div>
+  )
+}
+
+// 4. NEGOTIATION RESPONSE CARD
+function NegotiationResponseCard({ r, onDone }) {
+  const t = useT()
+  const [replyMode, setReplyMode] = useState(false)
+  const [revisedAmount, setRevisedAmount] = useState(r.budget_requested || '')
+  const [replyNote, setReplyNote] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [err, setErr] = useState(null)
+
+  const history = r.negotiation_history || []
+  const lastRound = history[history.length - 1] || {}
+
+  const handleAccept = async () => {
+    setBusy(true)
+    setErr(null)
+    try {
+      await api.respondNegotiation(r.id, {
+        action: 'accept',
+        reply_note: 'Accepted revised rate ceiling recommended by District Collector.',
+      })
+      onDone()
+    } catch (ex) {
+      setErr(ex)
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const handleReply = async (e) => {
+    e.preventDefault()
+    setBusy(true)
+    setErr(null)
+    try {
+      await api.respondNegotiation(r.id, {
+        action: 'reply',
+        revised_amount: parseFloat(revisedAmount),
+        reply_note: replyNote.trim(),
+      })
+      onDone()
+    } catch (ex) {
+      setErr(ex)
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <div className="card highlight mt" style={{ border: '2px solid #8b5cf6', background: '#faf5ff' }}>
+      <div className="row-between">
+        <h4 style={{ margin: 0, color: '#7c3aed' }}>
+          {t('Collector Counter-Offer (Round {n})', { n: history.length })}
+        </h4>
+        <Badge tone="violet">{t('Negotiation')}</Badge>
+      </div>
+
+      <div className="stack mt">
+        <div className="row small" style={{ gap: 16 }}>
+          <span>{t('Original Requested')}: <strong className="mono">₹{Number(r.budget_requested || 0).toLocaleString('en-IN')}</strong></span>
+          <span>{t('Collector Counter Amount')}: <strong className="mono" style={{ color: '#7c3aed', fontSize: '1.05rem' }}>₹{Number(lastRound.proposed_amount || 0).toLocaleString('en-IN')}</strong></span>
+        </div>
+
+        {lastRound.justification && (
+          <div className="alert alert-info mt">
+            <span className="small"><strong>{t('Collector SSR Justification')}:</strong> {lastRound.justification}</span>
+          </div>
+        )}
+
+        {!replyMode ? (
+          <div className="row mt">
+            <button type="button" className="btn btn-success btn-lg" disabled={busy} onClick={handleAccept}>
+              <CheckCircle2 size={18} />
+              {t('Accept Counter-Offer (₹{n})', { n: Number(lastRound.proposed_amount || 0).toLocaleString('en-IN') })}
+            </button>
+            <button type="button" className="btn btn-lg" onClick={() => setReplyMode(true)}>
+              <MessageSquare size={16} />
+              {t('Reply with Revised Proposal')}
+            </button>
+          </div>
+        ) : (
+          <form onSubmit={handleReply} className="stack mt">
+            <div className="grid g-2">
+              <div className="field">
+                <label htmlFor={`rev-amt-${r.id}`}>{t('Revised Proposed Amount (₹)')}</label>
+                <input
+                  id={`rev-amt-${r.id}`}
+                  type="number"
+                  className="input mono font-semibold"
+                  value={revisedAmount}
+                  onChange={(e) => setRevisedAmount(e.target.value)}
+                  required
+                />
+              </div>
+              <div className="field">
+                <label htmlFor={`rev-note-${r.id}`}>{t('Reply Justification to Collector')}</label>
+                <input
+                  id={`rev-note-${r.id}`}
+                  className="input"
+                  value={replyNote}
+                  onChange={(e) => setReplyNote(e.target.value)}
+                  placeholder={t('E.g. Cannot reduce below ₹45,000 due to rocky terrain transport surcharge.')}
+                  required
+                />
+              </div>
             </div>
-          ) : (
-            <div className="stack">
-              <div className="field"><label htmlFor={`rb-${r.id}`}>{t('What is still wrong?')}</label>
-                <textarea id={`rb-${r.id}`} className="textarea" rows={2} value={note} onChange={(e) => setNote(e.target.value)} placeholder={t('E.g. Photo does not show the tap. Send a clear photo.')} /></div>
-              <div className="row">
-                <button type="button" className="btn btn-danger" disabled={busy || note.trim().length < 5} onClick={() => decide('rework')}><Undo2 size={16} aria-hidden="true" />{t('Send back')}</button>
-                <button type="button" className="btn" onClick={() => setBack(false)}>{t('Cancel')}</button>
+            <div className="row">
+              <button type="submit" className="btn btn-primary" disabled={busy}>
+                <Send size={16} />
+                {busy ? t('Sending…') : t('Send Reply to Collector')}
+              </button>
+              <button type="button" className="btn" onClick={() => setReplyMode(false)}>{t('Cancel')}</button>
+            </div>
+          </form>
+        )}
+        <ErrorBox error={err} />
+      </div>
+    </div>
+  )
+}
+
+// 5. PROOF REVIEW CARD
+function ProofReviewCard({ r, onDone }) {
+  const t = useT()
+  const [reworkOpen, setReworkOpen] = useState(false)
+  const [reworkNote, setReworkNote] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [err, setErr] = useState(null)
+
+  const handleReview = async (action) => {
+    if (action === 'rework' && !reworkOpen) {
+      setReworkOpen(true)
+      return
+    }
+    setBusy(true)
+    setErr(null)
+    try {
+      await api.reviewProofCycle(r.id, {
+        action,
+        note: action === 'rework' ? reworkNote.trim() : 'Completion proof verified on site.',
+      })
+      onDone()
+    } catch (ex) {
+      setErr(ex)
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <div className="card highlight mt" style={{ border: '2px solid #16a34a', background: '#f0fdf4' }}>
+      <div className="row-between">
+        <h4 style={{ margin: 0, color: '#15803d' }}>{t('Check Work Completion Proof')}</h4>
+        <Badge tone="green">{t('Work Done')}</Badge>
+      </div>
+
+      <div className="grid g-2 mt">
+        <div>
+          <h5 className="small muted" style={{ margin: '0 0 6px' }}>{t('Completion Photos')}</h5>
+          <div className="row" style={{ gap: 8, flexWrap: 'wrap' }}>
+            {(r.completion_photos && r.completion_photos.length > 0 ? r.completion_photos : ['/sample_photos/pipe_fixed.svg']).map((p, i) => (
+              <img key={i} src={p} alt={t('Completion Proof')} style={{ width: 140, height: 100, objectFit: 'cover', borderRadius: 8, border: '2px solid #86efac' }} />
+            ))}
+          </div>
+        </div>
+        <div>
+          <h5 className="small muted" style={{ margin: '0 0 4px' }}>{t('Field Engineer Note')}</h5>
+          <p className="small quote" style={{ margin: 0 }}>{r.closure_note || t('Work completed according to approved budget.')}</p>
+        </div>
+      </div>
+
+      {reworkOpen ? (
+        <div className="stack mt">
+          <label htmlFor={`rwk-${r.id}`} className="small font-semibold">{t('What needs rework?')}</label>
+          <textarea
+            id={`rwk-${r.id}`}
+            className="textarea"
+            rows={2}
+            value={reworkNote}
+            onChange={(e) => setReworkNote(e.target.value)}
+            placeholder={t('E.g. Road surface patch is uneven. Re-roll the bituminous overlay.')}
+            required
+          />
+          <div className="row">
+            <button type="button" className="btn btn-danger" disabled={busy || reworkNote.trim().length < 5} onClick={() => handleReview('rework')}>
+              <Undo2 size={16} />
+              {t('Send Back to Field Officer')}
+            </button>
+            <button type="button" className="btn" onClick={() => setReworkOpen(false)}>{t('Cancel')}</button>
+          </div>
+        </div>
+      ) : (
+        <div className="row mt">
+          <button type="button" className="btn btn-success btn-lg" disabled={busy} onClick={() => handleReview('accept')}>
+            <CheckCircle2 size={18} />
+            {t('Accept Proof (Send for Citizen Confirmation)')}
+          </button>
+          <button type="button" className="btn btn-lg" onClick={() => setReworkOpen(true)}>
+            <Undo2 size={16} />
+            {t('Send for Rework')}
+          </button>
+        </div>
+      )}
+      <ErrorBox error={err} />
+    </div>
+  )
+}
+
+// 6. DH CASE ITEM CARD
+function DeptCaseCard({ r, tab, onChange }) {
+  const t = useT()
+  const [actionModal, setActionModal] = useState(null)
+  const [showEvidence, setShowEvidence] = useState(false)
+  const [verifyBusy, setVerifyBusy] = useState(false)
+
+  const handleVerify = async () => {
+    setVerifyBusy(true)
+    try {
+      await api.verifyHead(r.id, { action: 'verify' })
+      onChange()
+    } catch {
+      /* ignore */
+    } finally {
+      setVerifyBusy(false)
+    }
+  }
+
+  return (
+    <article className="card" style={{ borderColor: r.is_overdue ? 'var(--color-destructive)' : undefined }}>
+      <CaseHead r={r} />
+
+      {/* Action Row */}
+      {!actionModal && (
+        <div className="row mt" style={{ flexWrap: 'wrap', gap: 8 }}>
+          {/* New Queue: Verify or Reject */}
+          {r.status === 'SUBMITTED' && (
+            <>
+              <button type="button" className="btn btn-success btn-lg" disabled={verifyBusy} onClick={handleVerify}>
+                <CheckCircle2 size={18} />
+                {verifyBusy ? t('Verifying…') : t('Verify Grievance')}
+              </button>
+              <button type="button" className="btn btn-danger" onClick={() => setActionModal('reject')}>
+                <XCircle size={16} />
+                {t('Reject with Reason')}
+              </button>
+            </>
+          )}
+
+          {/* Verified Queue: Assign */}
+          {r.status === 'VERIFIED' && (
+            <button type="button" className="btn btn-primary btn-lg" onClick={() => setActionModal('assign')}>
+              <UserPlus size={18} />
+              {t('Assign to Field Officer')}
+            </button>
+          )}
+
+          {/* Budget Review: Forward or Negotiate */}
+          {r.status === 'BUDGET_REQUESTED' && (
+            <button type="button" className="btn btn-primary btn-lg" onClick={() => setActionModal('forward')}>
+              <Forward size={18} />
+              {t('Forward to Collector (₹{n})', { n: Number(r.budget_requested || 0).toLocaleString('en-IN') })}
+            </button>
+          )}
+
+          {r.status === 'NEGOTIATION' && (
+            <button type="button" className="btn btn-primary btn-lg" onClick={() => setActionModal('negotiate')} style={{ background: '#7c3aed' }}>
+              <MessageSquare size={18} />
+              {t('Respond to Collector Negotiation')}
+            </button>
+          )}
+
+          {/* Proof Review: Check Proof */}
+          {r.status === 'WORK_DONE' && (
+            <button type="button" className="btn btn-success btn-lg" onClick={() => setActionModal('proof')}>
+              <FileCheck size={18} />
+              {t('Review Completion Proof')}
+            </button>
+          )}
+
+          <button type="button" className="btn btn-sm" onClick={() => setShowEvidence(!showEvidence)}>
+            {showEvidence ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+            {showEvidence ? t('Hide Evidence') : t('View Evidence')}
+          </button>
+        </div>
+      )}
+
+      {/* Sub-modals */}
+      {actionModal === 'reject' && <RejectModal r={r} onDone={() => { setActionModal(null); onChange() }} onCancel={() => setActionModal(null)} />}
+      {actionModal === 'assign' && <AssignBox r={r} onDone={() => { setActionModal(null); onChange() }} />}
+      {actionModal === 'forward' && <ForwardModal r={r} onDone={() => { setActionModal(null); onChange() }} onCancel={() => setActionModal(null)} />}
+      {actionModal === 'negotiate' && <NegotiationResponseCard r={r} onDone={() => { setActionModal(null); onChange() }} />}
+      {actionModal === 'proof' && <ProofReviewCard r={r} onDone={() => { setActionModal(null); onChange() }} />}
+
+      {/* Expandable Evidence View */}
+      {showEvidence && (
+        <div className="mt" style={{ borderTop: '1px solid #e2e8f0', paddingTop: 12 }}>
+          <div className="grid g-2">
+            <div>
+              <h5 className="small muted" style={{ margin: '0 0 6px' }}>{t('Citizen Photos')}</h5>
+              <div className="row" style={{ gap: 6, flexWrap: 'wrap' }}>
+                {(r.photos || [r.photo_path || '/sample_photos/pipe_broken.svg']).map((p, i) => (
+                  <img key={i} src={p} alt="Citizen" style={{ width: 110, height: 80, objectFit: 'cover', borderRadius: 6, border: '1px solid #e2e8f0' }} />
+                ))}
+              </div>
+            </div>
+            {r.site_photos && r.site_photos.length > 0 && (
+              <div>
+                <h5 className="small muted" style={{ margin: '0 0 6px' }}>{t('Site Inspection Photos')}</h5>
+                <div className="row" style={{ gap: 6, flexWrap: 'wrap' }}>
+                  {r.site_photos.map((p, i) => (
+                    <img key={i} src={p} alt="Site" style={{ width: 110, height: 80, objectFit: 'cover', borderRadius: 6, border: '1px solid #e2e8f0' }} />
+                  ))}
+                </div>
+                {r.inspection_notes && <p className="xs quote mt">{r.inspection_notes}</p>}
+              </div>
+            )}
+          </div>
+
+          {r.budget_line_items && r.budget_line_items.length > 0 && (
+            <div className="mt">
+              <h5 className="small muted" style={{ margin: '0 0 4px' }}>{t('Line Items')}</h5>
+              <div style={{ overflowX: 'auto' }}>
+                <table className="table" style={{ width: '100%', fontSize: '0.82rem' }}>
+                  <thead>
+                    <tr><th>{t('Item')}</th><th>{t('Qty')}</th><th>{t('Unit Cost')}</th><th>{t('Total')}</th></tr>
+                  </thead>
+                  <tbody>
+                    {r.budget_line_items.map((it, i) => (
+                      <tr key={i}>
+                        <td>{it.item}</td>
+                        <td>{it.quantity} {it.unit || ''}</td>
+                        <td>₹{Number(it.unit_cost || 0).toLocaleString('en-IN')}</td>
+                        <td className="mono font-semibold">₹{Number(it.total || 0).toLocaleString('en-IN')}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
               </div>
             </div>
           )}
         </div>
-      </div>
-      <ErrorBox error={err} />
+      )}
     </article>
   )
 }
 
-const PAGE = 15
+// 7. TEAM PERFORMANCE TABLE COMPONENT
+function DhTeamTable({ data }) {
+  const t = useT()
+  const team = data?.team || []
+
+  return (
+    <Card title="Field Officer Performance Ledger" sub="One row per field officer in this district & department">
+      <div style={{ overflowX: 'auto' }}>
+        <table className="table" style={{ width: '100%', fontSize: '0.9rem' }}>
+          <thead>
+            <tr>
+              <th>{t('Field Officer')}</th>
+              <th>{t('Mandal')}</th>
+              <th>{t('Open Cases')}</th>
+              <th>{t('Overdue')}</th>
+              <th>{t('Allocated')}</th>
+              <th>{t('Spent')}</th>
+              <th>{t('Average Days to Close')}</th>
+            </tr>
+          </thead>
+          <tbody>
+            {team.map((fo, idx) => (
+              <tr key={idx}>
+                <td><strong>{fo.officer_name}</strong></td>
+                <td>{fo.mandal} {t('mandal')}</td>
+                <td><Badge tone={fo.open_cases > 5 ? 'amber' : 'blue'}>{fo.open_cases}</Badge></td>
+                <td>{fo.overdue_cases > 0 ? <Badge tone="red">{fo.overdue_cases}</Badge> : <Badge tone="green">0</Badge>}</td>
+                <td className="mono">₹{Number(fo.allocated_inr || 0).toLocaleString('en-IN')}</td>
+                <td className="mono">₹{Number(fo.spent_inr || 0).toLocaleString('en-IN')}</td>
+                <td><strong className="mono">{fo.average_days_to_close}</strong> {t('days')}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </Card>
+  )
+}
+
+// 8. MAIN DEPARTMENT HEAD SCREEN
+const DH_TABS = [
+  { key: 'new', label: 'New / Verify', icon: AlertCircle, tone: 'amber' },
+  { key: 'verified', label: 'Verified / Assign', icon: UserPlus, tone: 'blue' },
+  { key: 'assigned', label: 'Assigned / In Field', icon: Clock, tone: 'blue' },
+  { key: 'budget_review', label: 'Budget Requests', icon: DollarSign, tone: 'violet' },
+  { key: 'proof_review', label: 'Proof to Check', icon: FileCheck, tone: 'green' },
+  { key: 'team', label: 'Field Staff Performance', icon: Users, tone: 'blue' },
+]
 
 export default function DeptQueue() {
   const t = useT()
   const { user, roleInfo } = useApp()
   const [tab, setTab] = useState('new')
-  const [show, setShow] = useState(PAGE)
+
   const reqs = useAsync(() => api.get('/api/requests', { limit: 1000 }), [])
-  const proofQ = useAsync(() => api.get('/api/admin/pending-proof-review'), [])
-  const teamQ = useAsync(() => api.get('/api/officer/team'), [])
-  const reload = () => { reqs.reload(); proofQ.reload(); teamQ.reload() }
-  const team = (teamQ.data?.team || []).filter((o) => o.role === 'field_officer')
+  const teamQ = useAsync(() => api.dhTeamSummary(), [])
+
+  const reloadAll = () => {
+    reqs.reload()
+    teamQ.reload()
+  }
+
+  const items = reqs.data?.items || []
 
   const g = useMemo(() => {
-    const all = reqs.data?.items || []
-    const pend = proofQ.data?.items || []
-    const sev = (a, b) => b.severity - a.severity || (toDate(b.created_at) - toDate(a.created_at))
-    return {
-      new: all.filter((r) => !r.assigned_field_officer_id && !DONE.includes(r.status) && r.status !== 'resolved_pending_verification').sort(sev),
-      assigned: all.filter((r) => r.assigned_field_officer_id && OPEN_WORK.includes(r.status))
-        .sort((a, b) => (toDate(a.sla_due_at)?.getTime() ?? Infinity) - (toDate(b.sla_due_at)?.getTime() ?? Infinity)),
-      proof: pend.filter((i) => !proofAccepted(i.request)),
-      done: [...pend.filter((i) => proofAccepted(i.request)).map((i) => i.request), ...all.filter((r) => DONE.includes(r.status))],
-      late: all.filter((r) => r.is_overdue).length,
+    const res = { new: [], verified: [], assigned: [], budget_review: [], proof_review: [], all: items }
+    for (const r of items) {
+      if (r.status === 'SUBMITTED') res.new.push(r)
+      else if (r.status === 'VERIFIED') res.verified.push(r)
+      else if (['ASSIGNED', 'in_progress'].includes(r.status)) res.assigned.push(r)
+      else if (['BUDGET_REQUESTED', 'SENT_TO_COLLECTOR', 'NEGOTIATION'].includes(r.status)) res.budget_review.push(r)
+      else if (r.status === 'WORK_DONE') res.proof_review.push(r)
     }
-  }, [reqs.data, proofQ.data])
-  const ready = reqs.data && proofQ.data
-  const pick = (k) => { setTab(k); setShow(PAGE) }
-  const list = tab === 'new' ? g.new : tab === 'assigned' ? g.assigned : tab === 'done' ? g.done : []
+    return res
+  }, [items])
+
+  const overdueCount = items.filter((r) => r.is_overdue).length
 
   return (
     <div className="stack-md">
-      <PageHead title="Department queue" eyebrow={<>{jurisdictionText(user, t)}</>} steps={['Give new cases to your field officers', 'Check their photo proof', 'Accept or send back']}>
+      <PageHead
+        title="Department queue"
+        eyebrow={<>{jurisdictionText(user, t)}</>}
+        steps={['Verify & assign to field officer', 'Review budget & forward to Collector', 'Check completion proof']}
+      >
         {roleInfo?.job || 'Run your department in your district: give cases to field staff and check their proof.'}
       </PageHead>
-      <CountStrip value={tab} onPick={pick} items={[
-        { key: 'new', icon: Inbox, tone: 'amber', label: t('New'), n: ready ? g.new.length : null },
-        { key: 'assigned', icon: Hammer, tone: 'blue', label: t('With field officers'), n: ready ? g.assigned.length : null },
-        { key: 'proof', icon: ClipboardList, tone: 'violet', label: t('Proof to check'), n: ready ? g.proof.length : null },
-        { key: 'late', icon: Siren, tone: 'red', label: t('Late'), n: ready ? g.late : null },
-        { key: 'done', icon: CheckCircle2, tone: 'green', label: t('Done'), n: ready ? g.done.length : null },
-      ].map((x) => (x.key === 'late' ? { ...x, key: undefined } : x))} />
-      <Tabs value={tab} onChange={pick} label={t('Department queue')} tabs={[
-        { value: 'new', label: <>{t('New')} ({ready ? g.new.length : '…'})</> },
-        { value: 'assigned', label: <>{t('Assigned')} ({ready ? g.assigned.length : '…'})</> },
-        { value: 'proof', label: <>{t('Proof to check')} ({ready ? g.proof.length : '…'})</> },
-        { value: 'done', label: <>{t('Done')} ({ready ? g.done.length : '…'})</> },
+
+      <CountStrip items={[
+        { icon: AlertCircle, tone: 'amber', label: t('New to Verify'), n: g.new.length },
+        { icon: UserPlus, tone: 'blue', label: t('Pending Assignment'), n: g.verified.length },
+        { icon: DollarSign, tone: 'violet', label: t('Budget Requests'), n: g.budget_review.length },
+        { icon: FileCheck, tone: 'green', label: t('Proof to Check'), n: g.proof_review.length },
+        { icon: Siren, tone: 'red', label: t('SLA Overdue'), n: overdueCount },
       ]} />
-      {team.length > 0 && (tab === 'new' || tab === 'assigned') && (
-        <div className="card row small" style={{ boxShadow: 'none' }}>
-          <Users size={18} aria-hidden="true" /><strong>{t('My team')}:</strong>
-          {team.map((o) => <span key={o.id}>{o.name}{o.block ? ` (${o.block})` : ''} · {t('{n} open', { n: o.open_workload })}{o.overdue_count ? <> · <span style={{ color: 'var(--color-destructive)' }}>{t('{n} late', { n: o.overdue_count })}</span></> : null}</span>)}
-          <Link to="/clusters" className="btn btn-sm" style={{ marginLeft: 'auto' }}><Layers size={14} aria-hidden="true" />{t('Grouped needs')}</Link>
-        </div>
-      )}
-      <ErrorBox error={reqs.error || proofQ.error} />
-      {!ready ? <Loading height={260} /> : tab === 'proof' ? (
-        <div className="stack">
-          {g.proof.map((i) => <ProofReview key={i.request.id} item={i} onDone={reload} />)}
-          {g.proof.length === 0 && <div className="empty">{t('No proof waiting. All checked.')}</div>}
-        </div>
+
+      <Tabs
+        value={tab}
+        onChange={setTab}
+        label={t('Department queue')}
+        tabs={DH_TABS.map((tabItem) => ({
+          value: tabItem.key,
+          label: tabItem.key === 'team' ? t(tabItem.label) : <>{t(tabItem.label)} ({g[tabItem.key]?.length || 0})</>,
+        }))}
+      />
+
+      <ErrorBox error={reqs.error} />
+
+      {tab === 'team' ? (
+        <DhTeamTable data={teamQ.data} />
+      ) : reqs.loading && !reqs.data ? (
+        <Loading height={240} />
       ) : (
         <div className="stack">
-          {list.slice(0, show).map((r) => (
-            <article key={r.id} className="card" style={{ boxShadow: 'none', borderColor: r.is_overdue ? 'var(--color-destructive)' : undefined }}>
-              <CaseHead r={r} />
-              {tab !== 'done' && <AssignBox r={r} team={team} onDone={reload} />}
-            </article>
+          {(g[tab] || []).map((r) => (
+            <DeptCaseCard key={r.id} r={r} tab={tab} onChange={reloadAll} />
           ))}
-          {list.length === 0 && <div className="empty">{t('Nothing here.')}</div>}
-          {list.length > show && <button type="button" className="btn btn-lg" onClick={() => setShow(show + PAGE)}>{t('Show more ({n} left)', { n: list.length - show })}</button>}
+          {(g[tab] || []).length === 0 && (
+            <div className="empty">{t('No cases currently waiting in this queue.')}</div>
+          )}
         </div>
       )}
     </div>

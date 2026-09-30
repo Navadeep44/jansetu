@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 400" width="100%" height="100%">
+  <rect width="600" height="400" fill="#1e293b"/>
+  <!-- Smooth Bitumen Tar Road with Fresh White Markings -->
+  <polygon points="100,400 240,160 360,160 500,400" fill="#0f172a"/>
+  <line x1="300" y1="170" x2="300" y2="210" stroke="#f8fafc" stroke-width="8"/>
+  <line x1="300" y1="240" x2="300" y2="300" stroke="#f8fafc" stroke-width="12"/>
+  <line x1="300" y1="340" x2="300" y2="400" stroke="#f8fafc" stroke-width="16"/>
+  <text x="30" y="50" font-family="sans-serif" font-size="22" font-weight="bold" fill="#4ade80">AFTER: BT Blacktopping &amp; Compaction Done</text>
+  <text x="30" y="80" font-family="sans-serif" font-size="16" fill="#cbd5e1">250m Concrete &amp; Asphalt Road Ready</text>
+  <rect x="420" y="25" width="150" height="34" rx="6" fill="#22c55e"/>
+  <text x="442" y="48" font-family="sans-serif" font-size="14" font-weight="bold" fill="#ffffff">WORK COMPLETE</text>
+</svg>

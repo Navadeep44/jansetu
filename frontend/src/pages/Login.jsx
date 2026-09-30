@@ -81,6 +81,62 @@ function CitizenLogin({ next }) {
   )
 }
 
+function DemoAccountsTable({ onLogin }) {
+  const t = useT()
+  const accounts = [
+    { username: 'state_telangana', password: 'state123', role: 'State Admin', jurisdiction: 'Telangana', name: 'K. Chandrasekhar Reddy' },
+    { username: 'collector_adilabad', password: 'district123', role: 'District Collector', jurisdiction: 'Adilabad · Telangana', name: 'Anitha Rao, IAS' },
+    { username: 'collector_hyderabad', password: 'district123', role: 'District Collector', jurisdiction: 'Hyderabad · Telangana', name: 'K. Shashank, IAS' },
+    { username: 'dept_water_adi', password: 'dept123', role: 'Department Head', jurisdiction: 'Water · Adilabad · Telangana', name: 'Er. P. Venkatesh' },
+    { username: 'dept_roads_adi', password: 'dept123', role: 'Department Head', jurisdiction: 'Roads · Adilabad · Telangana', name: 'Er. K. Suresh' },
+    { username: 'dept_power_adi', password: 'dept123', role: 'Department Head', jurisdiction: 'Electricity · Adilabad · Telangana', name: 'Er. T. Satyanarayana' },
+    { username: 'dept_sanitation_adi', password: 'dept123', role: 'Department Head', jurisdiction: 'Sanitation · Adilabad · Telangana', name: 'Dr. M. Sailaja' },
+    { username: 'field_utnoor', password: 'field123', role: 'Field Officer', jurisdiction: 'Water · Utnoor mandal · Adilabad', name: 'Ravi Teja' },
+    { username: 'field_roads_utnoor', password: 'field123', role: 'Field Officer', jurisdiction: 'Roads · Utnoor mandal · Adilabad', name: 'M. Prakash' },
+    { username: 'field_jainoor', password: 'field123', role: 'Field Officer', jurisdiction: 'Water · Jainoor mandal · Adilabad', name: 'V. Naresh' },
+  ]
+
+  return (
+    <Card title="Demo Accounts Directory" sub="Click 'Log in' on any account to sign in immediately with that role and jurisdiction">
+      <div style={{ overflowX: 'auto' }}>
+        <table className="table" style={{ width: '100%', fontSize: '0.88rem' }}>
+          <thead>
+            <tr>
+              <th>{t('Role')}</th>
+              <th>{t('Officer Name')}</th>
+              <th>{t('Jurisdiction')}</th>
+              <th>{t('Username')}</th>
+              <th>{t('Password')}</th>
+              <th style={{ textAlign: 'right' }}>{t('Action')}</th>
+            </tr>
+          </thead>
+          <tbody>
+            {accounts.map((acc) => (
+              <tr key={acc.username} style={{ verticalAlign: 'middle' }}>
+                <td><span className="badge badge-blue">{t(acc.role)}</span></td>
+                <td><strong>{acc.name}</strong></td>
+                <td><span className="small">{acc.jurisdiction}</span></td>
+                <td><code className="mono">{acc.username}</code></td>
+                <td><code className="mono">{acc.password}</code></td>
+                <td style={{ textAlign: 'right' }}>
+                  <button
+                    type="button"
+                    className="btn btn-sm btn-primary"
+                    onClick={() => onLogin(acc.username, acc.password)}
+                  >
+                    <LogIn size={13} style={{ marginRight: 4 }} />
+                    {t('Log in')}
+                  </button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </Card>
+  )
+}
+
 function OfficialLogin() {
   const { login } = useApp()
   const t = useT()
@@ -102,34 +158,38 @@ function OfficialLogin() {
   }
   return (
     <div className="stack-md">
-    <div className="grid g-2" style={{ alignItems: 'start' }}>
-      <Card title="Official login" sub="For government staff only">
-        <form onSubmit={submit} className="stack-md">
-          <div className="field"><label htmlFor="u">{t('Username')}</label><input id="u" className="input" autoComplete="username" value={u} onChange={(e) => setU(e.target.value)} /></div>
-          <div className="field"><label htmlFor="p">{t('Password')}</label><input id="p" type="password" className="input" autoComplete="current-password" value={p} onChange={(e) => setP(e.target.value)} /></div>
-          <ErrorBox error={err} />
-          <button className="btn btn-primary btn-lg" disabled={busy || !u || !p}><LogIn size={18} aria-hidden="true" />{t(busy ? 'Signing in…' : 'Log in')}</button>
-        </form>
-        <p className="help mt">{t('In real use this connects to government sign-on (Parichay).')}</p>
-      </Card>
-      <Card title="Demo accounts" sub="Tap one to log in instantly">
-        <div className="stack">
-          {shown.map((d) => {
-            const ri = roleInfo(d.role)
-            return (
-              <motion.button key={d.username} whileHover={{ y: -2 }} whileTap={{ scale: 0.98 }} className="card role-card" style={{ textAlign: 'left', boxShadow: 'none', cursor: 'pointer' }} onClick={(e) => submit(e, d.username, d.password)}>
-                <div className="row-between"><strong>{d.name}</strong><span className="badge badge-blue">{t(ri?.label || d.role)}</span></div>
-                <div className="small">{t(ri?.job || '')}</div>
-                <div className="xs muted">{jurisdictionText(d, t)}</div>
-                <div className="xs mono muted">{d.username} / {d.password}</div>
-              </motion.button>
-            )
-          })}
-          {sorted.length > shown.length && <button type="button" className="btn" onClick={() => setShowAll(true)}>{t('Show all {n} demo accounts', { n: sorted.length })}</button>}
-        </div>
-      </Card>
-    </div>
-    <WhoLogsIn />
+      <div className="grid g-2" style={{ alignItems: 'start' }}>
+        <Card title="Official login" sub="For government staff only">
+          <form onSubmit={submit} className="stack-md">
+            <div className="field"><label htmlFor="u">{t('Username')}</label><input id="u" className="input" autoComplete="username" value={u} onChange={(e) => setU(e.target.value)} /></div>
+            <div className="field"><label htmlFor="p">{t('Password')}</label><input id="p" type="password" className="input" autoComplete="current-password" value={p} onChange={(e) => setP(e.target.value)} /></div>
+            <ErrorBox error={err} />
+            <button className="btn btn-primary btn-lg" disabled={busy || !u || !p}><LogIn size={18} aria-hidden="true" />{t(busy ? 'Signing in…' : 'Log in')}</button>
+          </form>
+          <p className="help mt">{t('In real use this connects to government sign-on (Parichay).')}</p>
+        </Card>
+        <Card title="Quick switch cards" sub="Tap one to log in instantly">
+          <div className="stack">
+            {shown.map((d) => {
+              const ri = roleInfo(d.role)
+              return (
+                <motion.button key={d.username} whileHover={{ y: -2 }} whileTap={{ scale: 0.98 }} className="card role-card" style={{ textAlign: 'left', boxShadow: 'none', cursor: 'pointer' }} onClick={(e) => submit(e, d.username, d.password)}>
+                  <div className="row-between"><strong>{d.name}</strong><span className="badge badge-blue">{t(ri?.label || d.role)}</span></div>
+                  <div className="small">{t(ri?.job || '')}</div>
+                  <div className="xs muted">{jurisdictionText(d, t)}</div>
+                  <div className="xs mono muted">{d.username} / {d.password}</div>
+                </motion.button>
+              )
+            })}
+            {sorted.length > shown.length && <button type="button" className="btn" onClick={() => setShowAll(true)}>{t('Show all {n} demo accounts', { n: sorted.length })}</button>}
+          </div>
+        </Card>
+      </div>
+
+      {/* Demo Accounts Table */}
+      <DemoAccountsTable onLogin={(uname, pwd) => submit(null, uname, pwd)} />
+
+      <WhoLogsIn />
     </div>
   )
 }

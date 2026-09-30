@@ -25,6 +25,8 @@ class Area(Base):
     name: Mapped[str] = mapped_column(String(120), index=True)
     aliases: Mapped[list] = mapped_column(JSON, default=list)  # native-script names for geo-resolution
     level: Mapped[str] = mapped_column(String(20))  # block | ward | subprefecture | township
+    mandal: Mapped[str] = mapped_column(String(80), default="", index=True)
+    village: Mapped[str] = mapped_column(String(120), default="", index=True)
     setting: Mapped[str] = mapped_column(String(10))  # rural | urban
     admin_code: Mapped[str] = mapped_column(String(40))  # LGD / IBGE / Stats SA code
     lat: Mapped[float] = mapped_column(Float)

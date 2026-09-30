@@ -37,6 +37,14 @@ class User(Base):
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
 
+    @property
+    def mandal(self):
+        return self.block
+
+    @mandal.setter
+    def mandal(self, val):
+        self.block = val
+
     def to_dict(self):
         return {
             "id": self.id,
@@ -51,6 +59,7 @@ class User(Base):
             "state": self.state,
             "district": self.district,
             "block": self.block,
+            "mandal": self.block,
             "department": self.department,
             "is_active": self.is_active,
             "created_at": self.created_at.isoformat() if self.created_at else None,

@@ -734,6 +734,10 @@ def run():
     # ---- V2 Governance & Officer Dashboard Suite Seeding --------------------------
     seed_v2_governance_suite(db)
 
+    # ---- Complete Telangana Grievance-to-Budget Cycle Dataset ---------------------
+    from app.seed.cycle_seed import seed_cycle_dataset
+    seed_cycle_dataset(db)
+
     db.commit()
     analytics_cache.bump()
     total = db.query(CitizenRequest).count()

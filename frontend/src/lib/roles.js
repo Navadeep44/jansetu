@@ -76,17 +76,17 @@ export const roleInfo = (r) => ROLES[normRole(r)] || null
 export const canSee = (r, page) => !!roleInfo(r)?.pages.includes(page)
 export const can = (r, action) => !!roleInfo(r)?.can?.[action]
 
-// Human text for the officer's area, e.g. "Utnoor block · Adilabad, Telangana · Water".
+// Human text for the officer's area, e.g. "Water · Utnoor mandal · Adilabad · Telangana".
 export function jurisdictionText(user, t = (s) => s) {
   if (!user) return ''
   const parts = []
-  if (user.block) parts.push(t('{b} block', { b: user.block }))
+  if (user.department) parts.push(t(DEPT_LABEL[user.department] || user.department))
+  const mandal = user.mandal || user.block
+  if (mandal) parts.push(`${mandal} ${t('mandal')}`)
   if (user.district) parts.push(t(user.district))
   if (user.state) parts.push(t(user.state))
-  if (!user.state && !user.district) parts.push(t('All India'))
-  let s = parts.join(', ')
-  if (user.department) s += ` · ${t(DEPT_LABEL[user.department] || user.department)}`
-  return s
+  if (parts.length === 0) return t('All India')
+  return parts.join(' · ')
 }
 
-export const DEPT_LABEL = { water: 'Water department', roads: 'Roads department', electricity: 'Power department', health: 'Health department', education: 'Education department', sanitation: 'Sanitation department' }
+export const DEPT_LABEL = { water: 'Water', roads: 'Roads', electricity: 'Electricity', health: 'Health', education: 'Education', sanitation: 'Sanitation' }

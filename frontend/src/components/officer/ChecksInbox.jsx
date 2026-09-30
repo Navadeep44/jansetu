@@ -1,195 +1,399 @@
-import { useEffect, useState } from 'react'
-import { Link } from 'react-router-dom'
-import { AlertTriangle, CheckCircle2, ClipboardCheck, Copy, ShieldAlert, Siren, Users } from 'lucide-react'
+// District Collector: Budget Approval Inbox & Department Oversight
+// Features:
+// 1. Budget Approval Inbox with full evidence (citizen photos, site photos, GPS, line items, DH forward note, negotiation history)
+// 2. District SSR Benchmark comparison
+// 3. Actions: APPROVE (allocates budget), REJECT (with reason), NEGOTIATE (counter-amount + written justification)
+// 4. One row per Department Head showing requests, approved ₹, rejected ₹, allocated vs spent, pending cases and SLA breaches
+import { useEffect, useMemo, useState } from 'react'
+import {
+  AlertCircle, AlertTriangle, Building2, Camera, CheckCircle2, ChevronDown, ChevronUp,
+  ClipboardCheck, DollarSign, Eye, FileText, Forward, Layers, MapPin, MessageSquare,
+  Scale, Send, ShieldAlert, Siren, TrendingDown, Users, Wallet, X, XCircle,
+} from 'lucide-react'
 import { api } from '../../api/client'
 import { useApp } from '../../context/AppContext'
 import { useT } from '../../i18n'
-import { useAsync } from '../../lib/useAsync'
-import { Badge, Card, ErrorBox, Loading, PageHead, SectorTag, StatusBadge, Tabs } from '../../components/ui'
 import { jurisdictionText } from '../../lib/roles'
-import { MoveDept } from './shared'
-import { CHANNEL_LABEL, LANG_NAMES, SECTOR_KEYS, SECTORS, ago, pct } from '../../lib/format'
+import { useAsync } from '../../lib/useAsync'
+import { Badge, Card, ErrorBox, Loading, PageHead, Tabs } from '../ui'
+import { CaseHead, CountStrip } from './shared'
 
-const FLAG = { needs_location: 'Place missing', low_confidence: 'AI not sure', duplicate: 'Maybe a repeat', coordinated: 'Copy-paste message' }
-const isUrgent = (r) => r.flags?.includes('urgent_safety')
-
-function ReviewItem({ r, areas, onDone }) {
+// 1. COLLECTOR DECISION MODAL (Approve, Reject, or Negotiate)
+function CollectorDecisionModal({ r, mode, onDone, onCancel }) {
   const t = useT()
-  const [cat, setCat] = useState(r.category === 'other' ? '' : r.category)
-  const [area, setArea] = useState(r.area_id || '')
+  const [amount, setAmount] = useState(mode === 'negotiate' ? (r.budget_requested ? Math.round(r.budget_requested * 0.85) : '') : '')
+  const [note, setNote] = useState(
+    mode === 'negotiate'
+      ? `Rate benchmarked against ${r.district} SSR average for ${r.category}. Trenching and labour costs reduced by 15%.`
+      : mode === 'approve'
+      ? 'Administrative and financial sanction accorded based on SSR inspection.'
+      : ''
+  )
+  const [busy, setBusy] = useState(false)
   const [err, setErr] = useState(null)
-  const act = async (action) => {
-    try { await api.review(r.id, { action, category: cat || undefined, area_id: area ? Number(area) : undefined }); onDone() } catch (e) { setErr(e) }
+
+  const submitDecision = async (e) => {
+    e.preventDefault()
+    setBusy(true)
+    setErr(null)
+    try {
+      if (mode === 'approve') {
+        await api.collectorDecision(r.id, { decision: 'approve', note: note.trim() })
+      } else if (mode === 'reject') {
+        if (!note.trim()) {
+          setErr(new Error(t('Please provide a rejection reason')))
+          setBusy(false)
+          return
+        }
+        await api.collectorDecision(r.id, { decision: 'reject', justification: note.trim() })
+      } else if (mode === 'negotiate') {
+        const counter = parseFloat(amount)
+        if (!counter || counter <= 0) {
+          setErr(new Error(t('Please enter a valid counter-offer amount')))
+          setBusy(false)
+          return
+        }
+        await api.collectorDecision(r.id, {
+          decision: 'negotiate',
+          counter_amount: counter,
+          justification: note.trim(),
+        })
+      }
+      onDone()
+    } catch (ex) {
+      setErr(ex)
+    } finally {
+      setBusy(false)
+    }
   }
-  const urgent = isUrgent(r)
-  const flags = [...new Set(r.flags || [])].filter((f) => f !== 'urgent_safety')
+
+  const border = mode === 'approve' ? '#16a34a' : mode === 'reject' ? '#ef4444' : '#8b5cf6'
+  const bg = mode === 'approve' ? '#f0fdf4' : mode === 'reject' ? '#fef2f2' : '#faf5ff'
+
   return (
-    <div className={`card ${urgent ? 'highlight' : ''}`} style={{ boxShadow: 'none', borderColor: urgent ? 'var(--color-destructive)' : undefined }}>
+    <div className="card highlight mt" style={{ border: `2px solid ${border}`, background: bg }}>
       <div className="row-between">
-        <div className="row">
-          {urgent && <Badge tone="red"><Siren size={12} aria-hidden="true" />{t('Urgent: danger')}</Badge>}
-          {flags.map((f) => <Badge key={f} tone="amber">{t(FLAG[f] || f.replace(/_/g, ' '))}</Badge>)}
-        </div>
-        <span className="xs muted mono">{r.tracking_id} · {ago(r.created_at, t)}</span>
+        <h4 style={{ margin: 0, color: border }}>
+          {mode === 'approve' ? t('Approve Budget & Sanction Funds') : mode === 'reject' ? t('Reject Budget Proposal') : t('Negotiate / Counter-Offer')}
+        </h4>
+        <button type="button" className="btn btn-sm" onClick={onCancel}><X size={14} /></button>
       </div>
-      <p className="quote mt"><span className="orig">{r.text}</span>{r.translated_text && r.translated_text !== r.text && <span className="en" style={{ display: 'block' }}>{r.translated_text}</span>}</p>
-      <div className="xs muted">{t(LANG_NAMES[r.language] || r.language)} · {t(CHANNEL_LABEL[r.channel] || r.channel)} · {t('AI sure: {p}', { p: pct(r.confidence) })} · {r.area || t('No place given')}</div>
-      <div className="grid g-3 mt" style={{ alignItems: 'end' }}>
-        <div className="field"><label htmlFor={`cat-${r.id}`}>{t('Problem type')}</label>
-          <select id={`cat-${r.id}`} className="select" style={{ minHeight: 44 }} value={cat} onChange={(e) => setCat(e.target.value)}>
-            <option value="">—</option>{SECTOR_KEYS.map((s) => <option key={s} value={s}>{t(SECTORS[s].label)}</option>)}
-          </select></div>
-        <div className="field"><label htmlFor={`area-${r.id}`}>{t('Place')}</label>
-          <select id={`area-${r.id}`} className="select" style={{ minHeight: 44 }} value={area} onChange={(e) => setArea(e.target.value)}>
-            <option value="">—</option>{areas.map((a) => <option key={a.id} value={a.id}>{a.name} ({t(a.district)})</option>)}
-          </select></div>
-        <div className="row">
-          <button className="btn btn-primary" onClick={() => act('approve')} disabled={!cat || !area}><CheckCircle2 size={16} aria-hidden="true" />{t('Confirm')}</button>
-          <button className="btn btn-danger" onClick={() => act('reject_spam')}>{t('Spam')}</button>
+
+      <form onSubmit={submitDecision} className="stack mt">
+        {mode === 'negotiate' && (
+          <div className="field">
+            <label htmlFor={`neg-amt-${r.id}`}>{t('Counter-Offer Budget (₹)')}</label>
+            <input
+              id={`neg-amt-${r.id}`}
+              type="number"
+              className="input mono font-semibold"
+              value={amount}
+              onChange={(e) => setAmount(e.target.value)}
+              placeholder="e.g. 42000"
+              required
+            />
+            <span className="help">
+              {t('Original Requested')}: ₹{Number(r.budget_requested || 0).toLocaleString('en-IN')}
+              {r.district_ssr_benchmark ? ` · ${t('District SSR Benchmark')}: ₹${Number(r.district_ssr_benchmark).toLocaleString('en-IN')}` : ''}
+            </span>
+          </div>
+        )}
+
+        <div className="field">
+          <label htmlFor={`dec-note-${r.id}`}>
+            {mode === 'negotiate' ? t('Written Justification (SSR Benchmark Comparison):') : t('Decision Note / Order:')}
+          </label>
+          <textarea
+            id={`dec-note-${r.id}`}
+            className="textarea"
+            rows={2}
+            value={note}
+            onChange={(e) => setNote(e.target.value)}
+            required
+          />
         </div>
-      </div>
-      {r.category && r.category !== 'other' && <div className="row mt"><MoveDept r={r} onDone={onDone} /></div>}
-      <ErrorBox error={err} />
+
+        <ErrorBox error={err} />
+
+        <div className="row" style={{ marginTop: 6 }}>
+          <button
+            type="submit"
+            className={`btn btn-lg ${mode === 'approve' ? 'btn-success' : mode === 'reject' ? 'btn-danger' : 'btn-primary'}`}
+            style={mode === 'negotiate' ? { background: '#7c3aed' } : undefined}
+            disabled={busy}
+          >
+            {mode === 'approve' && <CheckCircle2 size={18} />}
+            {mode === 'reject' && <XCircle size={18} />}
+            {mode === 'negotiate' && <Scale size={18} />}
+            {busy ? t('Submitting…') : mode === 'approve' ? t('Approve & Allocate ₹{n}', { n: Number(r.budget_requested || 0).toLocaleString('en-IN') }) : mode === 'reject' ? t('Confirm Rejection') : t('Send Counter-Offer')}
+          </button>
+          <button type="button" className="btn" onClick={onCancel}>{t('Cancel')}</button>
+        </div>
+      </form>
     </div>
   )
 }
 
-function CloseBox() {
+// 2. INBOX CASE CARD WITH FULL EVIDENCE
+function CollectorInboxCard({ r, onChange }) {
   const t = useT()
-  const [tid, setTid] = useState('')
-  const [req, setReq] = useState(null)
-  const [note, setNote] = useState('')
-  const [audit, setAudit] = useState(null)
-  const [msg, setMsg] = useState(null)
-  const [err, setErr] = useState(null)
-  useEffect(() => {
-    if (!req || note.length < 3) { setAudit(null); return }
-    const h = setTimeout(() => api.closeAudit(req.id, note).then(setAudit).catch(() => {}), 400)
-    return () => clearTimeout(h)
-  }, [note, req])
-  const find = async () => { setErr(null); setMsg(null); try { setReq((await api.track(tid.trim().toUpperCase())).request) } catch (e) { setErr(e) } }
-  const submit = async (force = false) => {
-    setErr(null)
-    try {
-      const r = await api.close(req.id, note, force)
-      setMsg(`${t('Sent. The citizen will be asked in {lang} if it is really fixed.', { lang: t(LANG_NAMES[req.language] || req.language) })}${r.audit?.formulaic ? ' ' + t('Marked as a copy-paste closure.') : ''}`)
-    } catch (e) { setErr(e) }
-  }
+  const [modalMode, setModalMode] = useState(null)
+  const [showEvidence, setShowEvidence] = useState(true)
+
+  const isNegotiation = r.status === 'NEGOTIATION'
+  const history = r.negotiation_history || []
+  const benchmark = r.district_ssr_benchmark || 38000.0
+  const reqAmt = parseFloat(r.budget_requested || 0)
+  const isAboveBenchmark = reqAmt > benchmark
+
   return (
-    <Card title="Close a case with proof" sub="Say what was done. The citizen checks before it is closed.">
-      <div className="row">
-        <label htmlFor="tid" className="sr-only">{t('Tracking ID')}</label>
-        <input id="tid" className="input mono" style={{ maxWidth: 260, minHeight: 44 }} placeholder="JS-IN-XXXXXX" value={tid} onChange={(e) => setTid(e.target.value)} />
-        <button className="btn" onClick={find}>{t('Open')}</button><span className="help">{t('Try')} JS-IN-RAMES1</span></div>
-      {req && (
-        <div className="stack mt">
-          <p className="quote"><span className="orig">{req.text}</span><span className="en" style={{ display: 'block' }}>{req.translated_text}</span></p>
-          <div className="field"><label htmlFor="atr">{t('What was done?')}</label>
-            <textarea id="atr" className="textarea" value={note} onChange={(e) => setNote(e.target.value)} placeholder={t('What, where, when. E.g. Drain cleaned and 120 m covered on 12 Sept. Photo added.')} /></div>
-          {audit && (
-            <div className={`alert ${audit.formulaic ? 'alert-warn' : 'alert-success'}`}>
-              {audit.formulaic ? <AlertTriangle size={18} aria-hidden="true" /> : <CheckCircle2 size={18} aria-hidden="true" />}
-              <div className="small"><strong>{t(audit.formulaic ? 'Too vague. Say what was really done.' : 'Clear and can be checked.')}</strong>
-                {audit.reasons?.length > 0 && <ul style={{ margin: '4px 0 0', paddingLeft: 18 }} lang="en">{audit.reasons.map((x) => <li key={x}>{x}</li>)}</ul>}</div>
-            </div>
+    <article className="card" style={{ borderColor: isNegotiation ? '#8b5cf6' : r.is_overdue ? 'var(--color-destructive)' : undefined }}>
+      <CaseHead r={r} />
+
+      {/* SSR Comparison Benchmark Pill */}
+      <div className="card mt" style={{ background: '#f8fafc', border: '1px solid #cbd5e1', padding: 12 }}>
+        <div className="row-between">
+          <span className="row" style={{ gap: 6 }}>
+            <Scale size={18} style={{ color: 'var(--color-primary)' }} />
+            <strong>{t('SSR Rate Benchmark Analysis')}</strong>
+          </span>
+          <span className="mono">
+            {t('District Average')}: <strong>₹{benchmark.toLocaleString('en-IN')}</strong>
+          </span>
+        </div>
+        <div className="row small mt" style={{ gap: 14 }}>
+          <span>{t('Requested Proposal')}: <strong className="mono font-bold">₹{reqAmt.toLocaleString('en-IN')}</strong></span>
+          {isAboveBenchmark ? (
+            <Badge tone="amber">
+              <TrendingDown size={12} style={{ verticalAlign: 'middle', marginRight: 2 }} />
+              +{Math.round(((reqAmt - benchmark) / benchmark) * 100)}% {t('above district SSR average')}
+            </Badge>
+          ) : (
+            <Badge tone="green">
+              {t('Within district benchmark')}
+            </Badge>
           )}
-          <div className="row"><button className="btn btn-primary" onClick={() => submit(false)} disabled={note.length < 5}><ClipboardCheck size={16} aria-hidden="true" />{t('Send for citizen check')}</button></div>
+        </div>
+      </div>
+
+      {/* Decision Buttons */}
+      {!modalMode && (
+        <div className="row mt" style={{ flexWrap: 'wrap', gap: 8 }}>
+          <button type="button" className="btn btn-success btn-lg" onClick={() => setModalMode('approve')}>
+            <CheckCircle2 size={18} />
+            {t('Approve ₹{n}', { n: reqAmt.toLocaleString('en-IN') })}
+          </button>
+          <button type="button" className="btn btn-primary btn-lg" onClick={() => setModalMode('negotiate')} style={{ background: '#7c3aed' }}>
+            <Scale size={18} />
+            {t('Negotiate / Counter-Offer')}
+          </button>
+          <button type="button" className="btn btn-danger btn-lg" onClick={() => setModalMode('reject')}>
+            <XCircle size={18} />
+            {t('Reject')}
+          </button>
+          <button type="button" className="btn btn-sm" onClick={() => setShowEvidence(!showEvidence)}>
+            {showEvidence ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+            {showEvidence ? t('Hide Evidence') : t('View Full Evidence')}
+          </button>
         </div>
       )}
-      {msg && <div className="alert alert-success mt" role="status"><CheckCircle2 size={18} aria-hidden="true" /><div className="small">{msg}</div></div>}
-      <ErrorBox error={err} />
+
+      {/* Active Modal */}
+      {modalMode && (
+        <CollectorDecisionModal
+          r={r}
+          mode={modalMode}
+          onDone={() => { setModalMode(null); onChange() }}
+          onCancel={() => setModalMode(null)}
+        />
+      )}
+
+      {/* Full Evidence Attachment */}
+      {showEvidence && (
+        <div className="mt" style={{ borderTop: '1px solid #e2e8f0', paddingTop: 14 }}>
+          {/* Department Head Forwarding Note */}
+          {r.dh_forward_note && (
+            <div className="alert alert-info" style={{ marginBottom: 12 }}>
+              <span className="small"><strong>{t('Department Head Forwarding Note')}:</strong> {r.dh_forward_note}</span>
+            </div>
+          )}
+
+          {/* Photos Grid: Citizen Before + Field Officer Site Photos */}
+          <div className="grid g-2">
+            <div>
+              <h5 className="small muted" style={{ margin: '0 0 6px' }}>{t('Citizen Photos')}</h5>
+              <div className="row" style={{ gap: 6, flexWrap: 'wrap' }}>
+                {(r.photos || [r.photo_path || '/sample_photos/pipe_broken.svg']).map((p, i) => (
+                  <img key={i} src={p} alt="Citizen" style={{ width: 120, height: 90, objectFit: 'cover', borderRadius: 8, border: '1px solid #e2e8f0' }} />
+                ))}
+              </div>
+            </div>
+            <div>
+              <h5 className="small muted" style={{ margin: '0 0 6px' }}>{t('Site Inspection Photos (Field Officer)')}</h5>
+              <div className="row" style={{ gap: 6, flexWrap: 'wrap' }}>
+                {(r.site_photos && r.site_photos.length > 0 ? r.site_photos : ['/sample_photos/pipe_broken.svg']).map((p, i) => (
+                  <img key={i} src={p} alt="Site" style={{ width: 120, height: 90, objectFit: 'cover', borderRadius: 8, border: '1px solid #e2e8f0' }} />
+                ))}
+              </div>
+              {r.inspection_lat && <div className="xs mono muted mt">GPS: {r.inspection_lat}, {r.inspection_lng}</div>}
+              {r.inspection_notes && <p className="small quote mt" style={{ margin: '4px 0 0' }}>{r.inspection_notes}</p>}
+            </div>
+          </div>
+
+          {/* Line Items Table */}
+          {r.budget_line_items && r.budget_line_items.length > 0 && (
+            <div className="mt" style={{ borderTop: '1px solid #e2e8f0', paddingTop: 10 }}>
+              <h5 className="small muted" style={{ margin: '0 0 6px' }}>{t('Costed Budget Line Items')}</h5>
+              <div style={{ overflowX: 'auto' }}>
+                <table className="table" style={{ width: '100%', fontSize: '0.85rem' }}>
+                  <thead>
+                    <tr><th>{t('Item')}</th><th>{t('Qty')}</th><th>{t('Unit Cost')}</th><th>{t('Total (₹)')}</th></tr>
+                  </thead>
+                  <tbody>
+                    {r.budget_line_items.map((it, idx) => (
+                      <tr key={idx}>
+                        <td>{it.item}</td>
+                        <td>{it.quantity} {it.unit || ''}</td>
+                        <td>₹{Number(it.unit_cost || 0).toLocaleString('en-IN')}</td>
+                        <td className="mono font-semibold">₹{Number(it.total || 0).toLocaleString('en-IN')}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
+          {/* Negotiation History if any rounds occurred */}
+          {history.length > 0 && (
+            <div className="mt" style={{ borderTop: '1px solid #e2e8f0', paddingTop: 10 }}>
+              <h5 className="small muted" style={{ margin: '0 0 6px' }}>{t('Negotiation Rounds History')}</h5>
+              <div className="stack" style={{ gap: 6 }}>
+                {history.map((h, i) => (
+                  <div key={i} className="small" style={{ background: '#f8fafc', padding: '6px 10px', borderRadius: 6 }}>
+                    <strong>{t('Round {n}', { n: h.round })} ({h.actor_role === 'district_officer' ? t('Collector') : t('Department Head')}):</strong> ₹{Number(h.proposed_amount || 0).toLocaleString('en-IN')} — {h.justification}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+    </article>
+  )
+}
+
+// 3. DEPARTMENT HEAD SUMMARY TABLE (1 row per department head)
+function DeptHeadSummaryTable({ data }) {
+  const t = useT()
+  const rows = data?.departments || []
+
+  return (
+    <Card title="Department Oversight Ledger" sub="One row per department head: proposals, sanctioned budget, expenses, and SLA compliance">
+      <div style={{ overflowX: 'auto' }}>
+        <table className="table" style={{ width: '100%', fontSize: '0.9rem' }}>
+          <thead>
+            <tr>
+              <th>{t('Department')}</th>
+              <th>{t('Department Head')}</th>
+              <th>{t('Requests')}</th>
+              <th>{t('Approved ₹')}</th>
+              <th>{t('Rejected ₹')}</th>
+              <th>{t('Allocated ₹')}</th>
+              <th>{t('Spent ₹')}</th>
+              <th>{t('Pending Cases')}</th>
+              <th>{t('SLA Breaches')}</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((row, idx) => (
+              <tr key={idx}>
+                <td><strong>{t(row.department_label)}</strong></td>
+                <td>{row.head_name}</td>
+                <td><Badge tone="blue">{row.requests_count}</Badge></td>
+                <td className="mono font-semibold" style={{ color: '#16a34a' }}>₹{Number(row.approved_inr || 0).toLocaleString('en-IN')}</td>
+                <td className="mono" style={{ color: '#ef4444' }}>₹{Number(row.rejected_inr || 0).toLocaleString('en-IN')}</td>
+                <td className="mono">₹{Number(row.allocated_inr || 0).toLocaleString('en-IN')}</td>
+                <td className="mono">₹{Number(row.spent_inr || 0).toLocaleString('en-IN')}</td>
+                <td><Badge tone={row.pending_cases > 10 ? 'amber' : 'blue'}>{row.pending_cases}</Badge></td>
+                <td>{row.sla_breaches > 0 ? <Badge tone="red">{row.sla_breaches}</Badge> : <Badge tone="green">0</Badge>}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
     </Card>
   )
 }
 
-function CountTile({ icon: Icon, tone, label, n, active, onClick }) {
-  return (
-    <button type="button" onClick={onClick} aria-pressed={active} className={`card stat tile-${tone}`}
-      style={{ textAlign: 'left', font: 'inherit', cursor: 'pointer', minHeight: 88, boxShadow: 'none', outline: active ? '3px solid var(--color-accent)' : undefined, outlineOffset: 2 }}>
-      <div className="stat-label"><Icon size={18} aria-hidden="true" />{label}</div>
-      <div className="stat-value" style={{ fontSize: '2.2rem' }}>{n ?? '…'}</div>
-    </button>
-  )
-}
-
-// District Collector / super admin: "Checks" — urgent, unclear reports, fake closures, copy-paste campaigns.
+// 4. MAIN COLLECTOR SCREEN
 export default function ChecksInbox() {
-  const { stateParam, user } = useApp()
   const t = useT()
-  const [tab, setTab] = useState('review')
-  const q = useAsync(() => api.reviewQueue(), [])
-  const areas = useAsync(() => api.areas(stateParam), [stateParam])
-  const all = useAsync(() => api.requests({ state: stateParam, limit: 40 }), [stateParam])
-  const d = q.data
-  const urgent = d?.needs_review?.filter(isUrgent) || []
-  const tiles = [
-    { v: 'urgent', icon: Siren, tone: 'red', label: t('Urgent'), n: d ? urgent.length : null },
-    { v: 'review', icon: ClipboardCheck, tone: 'amber', label: t('To review'), n: d?.needs_review?.length },
-    { v: 'closures', icon: ShieldAlert, tone: 'violet', label: t('Fake closures'), n: d?.formulaic_closures?.length },
-    { v: 'campaigns', icon: Copy, tone: 'blue', label: t('Copy-paste campaigns'), n: d?.campaigns?.length },
-  ]
-  const list = tab === 'urgent' ? urgent : d?.needs_review || []
+  const { user, roleInfo } = useApp()
+  const [tab, setTab] = useState('inbox')
+
+  const district = user?.district || 'Adilabad'
+
+  const inboxQ = useAsync(() => api.collectorInbox({ district }), [district])
+  const summaryQ = useAsync(() => api.collectorSummary({ district }), [district])
+
+  const reloadAll = () => {
+    inboxQ.reload()
+    summaryQ.reload()
+  }
+
+  const items = inboxQ.data?.items || []
+  const departments = summaryQ.data?.departments || []
+
+  const totalReqs = departments.reduce((acc, d) => acc + (d.requests_count || 0), 0)
+  const totalApproved = departments.reduce((acc, d) => acc + (d.approved_inr || 0), 0)
+  const totalAllocated = departments.reduce((acc, d) => acc + (d.allocated_inr || 0), 0)
+  const totalSpent = departments.reduce((acc, d) => acc + (d.spent_inr || 0), 0)
+  const totalBreaches = departments.reduce((acc, d) => acc + (d.sla_breaches || 0), 0)
+
   return (
     <div className="stack-md">
-      <PageHead title="Checks" eyebrow={<>{jurisdictionText(user, t)}</>} steps={['Open a report', 'Fix the problem type or place', 'Press Confirm: the citizen is told']}>
-        Unclear reports, urgent cases and closures to check.
+      <PageHead
+        title="Budget approval inbox"
+        eyebrow={<>{jurisdictionText(user, t)}</>}
+        steps={['Review line-item proposals', 'Compare with SSR benchmarks', 'Approve, Reject, or Negotiate counter-offer']}
+      >
+        {roleInfo?.job || 'Decide what your district builds first, and check that work is really done.'}
       </PageHead>
-      <section className="card" aria-labelledby="today-h">
-        <h2 id="today-h" style={{ margin: '0 0 12px', fontSize: '1.15rem' }}>{t('Today')}</h2>
-        <div className="grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))' }}>
-          {tiles.map((x) => <CountTile key={x.v} icon={x.icon} tone={x.tone} label={x.label} n={x.n} active={tab === x.v} onClick={() => setTab(x.v)} />)}
-        </div>
-      </section>
-      <Tabs value={tab} onChange={setTab} tabs={[
-        { value: 'urgent', label: <>{t('Urgent ({n})', { n: d ? urgent.length : '…' })}</> },
-        { value: 'review', label: <>{t('To review ({n})', { n: d?.needs_review?.length ?? '…' })}</> },
-        { value: 'closures', label: <>{t('Fake closures ({n})', { n: d?.formulaic_closures?.length ?? '…' })}</> },
-        { value: 'close', label: 'Close a case' },
-        { value: 'campaigns', label: <>{t('Copy-paste campaigns ({n})', { n: d?.campaigns?.length ?? '…' })}</> },
-        { value: 'all', label: 'All reports' },
+
+      <CountStrip items={[
+        { icon: DollarSign, tone: 'violet', label: t('Budget Inbox Pending'), n: items.length },
+        { icon: CheckCircle2, tone: 'green', label: t('Approved Budget'), n: `₹${totalApproved.toLocaleString('en-IN')}` },
+        { icon: Wallet, tone: 'blue', label: t('Allocated'), n: `₹${totalAllocated.toLocaleString('en-IN')}` },
+        { icon: Users, tone: 'amber', label: t('Spent on Site'), n: `₹${totalSpent.toLocaleString('en-IN')}` },
+        { icon: Siren, tone: 'red', label: t('SLA Breaches'), n: totalBreaches },
       ]} />
-      <ErrorBox error={q.error} />
-      {q.loading && <Loading height={300} />}
-      {d && (tab === 'review' || tab === 'urgent') && (
+
+      <Tabs
+        value={tab}
+        onChange={setTab}
+        label={t('Collector Workspace')}
+        tabs={[
+          { value: 'inbox', label: <>{t('Budget Approval Inbox')} ({items.length})</> },
+          { value: 'departments', label: t('Department Overview') },
+        ]}
+      />
+
+      <ErrorBox error={inboxQ.error || summaryQ.error} />
+
+      {tab === 'departments' ? (
+        <DeptHeadSummaryTable data={summaryQ.data} />
+      ) : inboxQ.loading && !inboxQ.data ? (
+        <Loading height={240} />
+      ) : (
         <div className="stack">
-          <div className="alert alert-info"><ShieldAlert size={18} aria-hidden="true" /><div className="small">{t('The AI never rejects a citizen. Unclear reports wait here for you.')}</div></div>
-          {list.map((r) => <ReviewItem key={r.id} r={r} areas={areas.data || []} onDone={q.reload} />)}
-          {list.length === 0 && <div className="empty">{t('All done. Nothing waiting.')}</div>}
-        </div>
-      )}
-      {d && tab === 'closures' && (
-        <Card title="Closed on paper, not fixed" sub="Like “Your grievance has been disposed”. The citizen is asked. If they say no, it reopens.">
-          <div className="table-wrap"><table className="table">
-            <thead><tr><th>{t('ID')}</th><th>{t('Place')}</th><th>{t('Need')}</th><th>{t('What the office wrote')}</th><th>{t('Status')}</th></tr></thead>
-            <tbody>{d.formulaic_closures.map((r) => (
-              <tr key={r.id}><td className="mono"><Link to={`/track/${r.tracking_id}`}>{r.tracking_id}</Link></td><td>{r.area}</td><td><SectorTag sector={r.category} short /></td>
-                <td className="small">{r.closure_note}</td><td><StatusBadge status={r.status} /></td></tr>))}</tbody>
-          </table></div>
-        </Card>
-      )}
-      {tab === 'close' && <CloseBox />}
-      {d && tab === 'campaigns' && (
-        <Card title="Copy-paste campaigns" sub="Same message from many homes in a few hours. They count less. Check on the ground.">
-          {d.campaigns.map((c, i) => (
-            <div key={i} className="alert alert-warn" style={{ marginBottom: 8 }}><Users size={18} aria-hidden="true" />
-              <div className="small"><strong>{t('{n} same messages', { n: c.count })}</strong> · {c.area} · <SectorTag sector={c.category} short /> · {t('first seen')} {ago(c.first, t)}<div className="quote mt">{c.text}</div></div></div>
+          {items.map((r) => (
+            <CollectorInboxCard key={r.id} r={r} onChange={reloadAll} />
           ))}
-          {d.campaigns.length === 0 && <div className="empty">{t('No copy-paste campaigns found.')}</div>}
-        </Card>
-      )}
-      {tab === 'all' && (
-        <Card title="Latest reports" sub={<>{t('{n} in total', { n: all.data?.total?.toLocaleString('en-IN') ?? '…' })}</>}>
-          {all.loading ? <Loading /> : (
-            <div className="table-wrap"><table className="table">
-              <thead><tr><th>{t('ID')}</th><th>{t('When')}</th><th>{t('How')}</th><th>{t('Language')}</th><th>{t('Place')}</th><th>{t('Need')}</th><th>{t('Message (names removed)')}</th><th>{t('Status')}</th></tr></thead>
-              <tbody>{all.data?.items.map((r) => (
-                <tr key={r.id}><td className="mono xs"><Link to={`/track/${r.tracking_id}`}>{r.tracking_id}</Link></td><td className="xs">{ago(r.created_at, t)}</td>
-                  <td className="xs">{t(CHANNEL_LABEL[r.channel] || r.channel)}</td><td className="xs">{t(LANG_NAMES[r.language] || r.language)}</td><td className="small">{r.area}</td>
-                  <td><SectorTag sector={r.category} short /></td><td className="small" style={{ maxWidth: 380 }}>{r.text}</td><td><StatusBadge status={r.status} /></td></tr>
-              ))}</tbody>
-            </table></div>
+          {items.length === 0 && (
+            <div className="empty">{t('No budget proposals currently awaiting Collector review.')}</div>
           )}
-        </Card>
+        </div>
       )}
     </div>
   )

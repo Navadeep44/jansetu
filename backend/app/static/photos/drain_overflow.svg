@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 400" width="100%" height="100%">
+  <rect width="600" height="400" fill="#334155"/>
+  <rect x="150" y="140" width="300" height="260" fill="#1e293b"/>
+  <!-- Stagnant Sludge & Debris -->
+  <path d="M 150 260 Q 300 230 450 280 L 450 400 L 150 400 Z" fill="#3f3f46"/>
+  <circle cx="240" cy="300" r="16" fill="#52525b"/>
+  <circle cx="360" cy="320" r="22" fill="#27272a"/>
+  <text x="30" y="50" font-family="sans-serif" font-size="22" font-weight="bold" fill="#f87171">BEFORE: Clogged Drainage Channel</text>
+  <text x="30" y="80" font-family="sans-serif" font-size="16" fill="#cbd5e1">Stagnant Sewage &amp; Silt Inundation</text>
+  <rect x="420" y="25" width="150" height="34" rx="6" fill="#ef4444"/>
+  <text x="440" y="48" font-family="sans-serif" font-size="14" font-weight="bold" fill="#ffffff">SITE INSPECTION</text>
+</svg>
