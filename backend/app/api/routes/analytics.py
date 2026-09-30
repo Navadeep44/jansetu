@@ -5,7 +5,7 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
-from app.models import CitizenRequest, DemandCluster, Project
+from app.models import Area, CitizenRequest, DemandCluster, Project
 from app.services import analytics_cache, scoring, trends
 
 router = APIRouter(prefix="/analytics", tags=["analytics"])
@@ -17,11 +17,11 @@ def _weights(demand: float | None, deficit: float | None, vulnerability: float |
 
 
 @router.get("/overview")
-def overview(country: str | None = None, db: Session = Depends(get_db)):
+def overview(state: str | None = None, country: str | None = None, db: Session = Depends(get_db)):
     def build():
         q = db.query(CitizenRequest)
-        if country:
-            q = q.filter(CitizenRequest.country_code == country)
+        if state:
+            q = q.join(Area, CitizenRequest.area_id == Area.id).filter(Area.state == state)
         total = q.count()
         hh = q.with_entities(func.count(func.distinct(CitizenRequest.household_hash))).scalar()
         langs = q.with_entities(func.count(func.distinct(CitizenRequest.language))).scalar()
@@ -30,11 +30,12 @@ def overview(country: str | None = None, db: Session = Depends(get_db)):
         cat = dict(q.with_entities(CitizenRequest.category, func.count()).group_by(CitizenRequest.category).all())
         cq = db.query(DemandCluster)
         pq = db.query(Project).filter(Project.source == "recommended")
-        if country:
-            cq = cq.filter(DemandCluster.country_code == country)
-            pq = pq.filter(Project.country_code == country)
-        silent = [r for r in scoring.silent_zones(db) if not country or r["country"] == country]
-        al = scoring.alignment(db, country)
+        if state:
+            cq = cq.join(Area, DemandCluster.area_id == Area.id).filter(Area.state == state)
+            pq = pq.join(Area, Project.area_id == Area.id).filter(Area.state == state)
+        silent = scoring.silent_zones(db, state=state)
+        al = scoring.alignment(db, state=state)
+        nat = scoring.alignment(db, national=True).get("India", {})
         return {
             "total_requests": total, "unique_households": hh, "languages": langs, "channels": ch, "status": st,
             "categories": cat, "clusters": cq.count(), "recommended_projects": pq.count(),
@@ -42,11 +43,21 @@ def overview(country: str | None = None, db: Session = Depends(get_db)):
             "silent_zones": len(silent), "silent_areas": len({r["area_id"] for r in silent}),
             "voice_share": round((ch.get("ivr", 0) + ch.get("community", 0)) / max(total, 1), 3),
             "alignment": {c: {"alignment_score": v["alignment_score"], "share_to_below_median_need": v["share_to_below_median_need"],
-                              "plan_budget_usd": v["plan_budget_usd"]} for c, v in al.items()},
-            "alerts": len(trends.alerts(db, country)),
+                              "plan_budget": v["plan_budget_local"]} for c, v in al.items()},
+            "alignment_national": {"alignment_score": nat.get("alignment_score", 0), "plan_budget": nat.get("plan_budget_local", 0),
+                                   "share_to_below_median_need": nat.get("share_to_below_median_need", 0)},
+            "states": len({a.state for a in db.query(Area).all()}),
+            "districts": len({(a.state, a.district) for a in db.query(Area).all()}),
+            "alerts": len(trends.alerts(db, state=state)),
             "needs_review": st.get("needs_review", 0),
         }
-    return analytics_cache.cached(("overview", country), build)
+    return analytics_cache.cached(("overview", state), build)
+
+
+@router.get("/states")
+def states(db: Session = Depends(get_db)):
+    """National view for policymakers: one card per state."""
+    return analytics_cache.cached(("states",), lambda: scoring.states(db))
 
 
 @router.get("/need-gap")
@@ -61,34 +72,35 @@ def need_gap(country: str | None = None, sector: str | None = None, state: str |
 
 
 @router.get("/areas")
-def areas(sector: str | None = None, country: str | None = None, db: Session = Depends(get_db)):
+def areas(sector: str | None = None, state: str | None = None, district: str | None = None, country: str | None = None,
+          db: Session = Depends(get_db)):
     rows = scoring.area_summary(db, sector=sector)
-    return [a for a in rows if not country or a["country"] == country]
+    return [a for a in rows if (not state or a["state"] == state) and (not district or a["district"] == district)]
 
 
 @router.get("/silent-zones")
-def silent(country: str | None = None, db: Session = Depends(get_db)):
-    return scoring.silent_zones(db, country)
+def silent(state: str | None = None, country: str | None = None, db: Session = Depends(get_db)):
+    return scoring.silent_zones(db, state=state)
 
 
 @router.get("/alignment")
-def alignment(country: str | None = None, db: Session = Depends(get_db)):
-    return scoring.alignment(db, country)
+def alignment(state: str | None = None, national: bool = False, country: str | None = None, db: Session = Depends(get_db)):
+    return scoring.alignment(db, state=state, national=national)
 
 
 @router.get("/trends")
-def trend(country: str | None = None, sector: str | None = None, weeks: int = 12, db: Session = Depends(get_db)):
-    return trends.weekly_series(db, weeks, country, sector)
+def trend(state: str | None = None, sector: str | None = None, weeks: int = 12, country: str | None = None, db: Session = Depends(get_db)):
+    return trends.weekly_series(db, weeks, None, sector, state)
 
 
 @router.get("/alerts")
-def alerts(country: str | None = None, db: Session = Depends(get_db)):
-    return trends.alerts(db, country)
+def alerts(state: str | None = None, country: str | None = None, db: Session = Depends(get_db)):
+    return trends.alerts(db, state=state)
 
 
 @router.get("/sectors")
-def sectors(country: str | None = None, db: Session = Depends(get_db)):
-    rows = [r for r in scoring.need_gap(db) if not country or r["country"] == country]
+def sectors(state: str | None = None, country: str | None = None, db: Session = Depends(get_db)):
+    rows = [r for r in scoring.need_gap(db) if not state or r["state"] == state]
     out = {}
     for r in rows:
         s = out.setdefault(r["sector"], {"sector": r["sector"], "reports": 0, "households": 0.0, "ngi_sum": 0.0, "n": 0,

@@ -61,7 +61,7 @@ body { background: #f8fafc; }
 .an-country .lp-lang { min-height: 34px; }
 
 @media (max-width: 1480px) { .an .lp-brand small { display: none; } }
-@media (max-width: 1180px) {
+@media (max-width: 1360px) {
   .an-links { display: none; }
   .an-burger { display: inline-grid; place-items: center; margin-left: 4px; }
   .an-actions { margin-left: auto; }
@@ -72,7 +72,7 @@ body { background: #f8fafc; }
   .an-work-title { display: none; }
   .an-country span { display: none; }
 }
-@media (max-width: 1180px) {
+@media (max-width: 1360px) {
   .an-drawer { display: flex; flex-direction: column; gap: 2px; padding: 8px var(--gutter) 24px; background: var(--lp-navy); color: #fff; max-height: calc(100vh - 64px); overflow-y: auto; }
   .an.solid .an-drawer { background: #fff; color: var(--lp-ink); }
   .an-drawer-title { font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.1em; opacity: 0.6; padding: 14px 4px 6px; }
@@ -188,3 +188,37 @@ body { background: #f8fafc; }
 .narrow > :not(.page-hero) { max-width: 1000px; margin-inline: auto; width: 100%; }
 .narrow > .login-switch { width: auto; }
 .an a, .lp-footer a, .lp-brand { text-decoration: none; }
+
+/* page hero: listen button + language switch */
+.page-hero-top { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.page-listen { display: inline-flex; align-items: center; gap: 6px; min-height: 32px; padding: 0 12px; border-radius: 999px; border: 1px solid rgba(251,191,36,0.45); background: rgba(245,158,11,0.12); color: #fde68a; font-weight: 600; font-size: 0.82rem; cursor: pointer; }
+.page-listen:hover { background: rgba(245,158,11,0.22); }
+.lang-switch { display: inline-flex; padding: 3px; gap: 2px; border-radius: 999px; border: 1px solid rgba(255,255,255,0.28); background: rgba(255,255,255,0.06); }
+.lang-switch button { position: relative; border: 0; background: transparent; color: inherit; font: inherit; font-weight: 700; font-size: 0.9rem; min-width: 44px; min-height: 36px; padding: 0 12px; border-radius: 999px; cursor: pointer; }
+.lang-switch button > span { position: relative; z-index: 1; }
+.lang-switch .lang-pill { position: absolute; inset: 0; border-radius: 999px; background: #fff; }
+.lang-switch button[aria-pressed=true] { color: #0f172a; }
+.an.solid .lang-switch, .lp-nav.solid .lang-switch { border-color: #cbd5e1; background: #f8fafc; }
+.an.solid .lang-switch .lang-pill, .lp-nav.solid .lang-switch .lang-pill { background: #0f172a; }
+.an.solid .lang-switch button[aria-pressed=true], .lp-nav.solid .lang-switch button[aria-pressed=true] { color: #fff; }
+.lang-switch.lg button { min-height: 44px; font-size: 1rem; }
+/* first-visit language chooser */
+.lang-modal-backdrop { position: fixed; inset: 0; z-index: 3000; background: rgba(2,6,23,0.72); backdrop-filter: blur(6px); display: grid; place-items: center; padding: 16px; }
+.lang-modal { width: min(560px, 100%); border-radius: 24px; background: #fff; padding: 28px; box-shadow: var(--shadow-lg); text-align: center; }
+.lang-modal h2 { font-size: 1.35rem; margin: 6px 0 4px; }
+.lang-modal p { color: #475569; margin: 0 0 18px; }
+.lang-choices { display: grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap: 12px; }
+.lang-choice { display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 18px 8px; border-radius: 18px; border: 2px solid #e2e8f0; background: #f8fafc; cursor: pointer; font: inherit; color: #0f172a; }
+.lang-choice:hover, .lang-choice:focus-visible { border-color: #0369a1; background: #e0f2fe; }
+.lang-choice strong { font-size: 1.5rem; }
+.lang-choice small { color: #64748b; }
+@media (max-width: 480px) { .lang-choices { grid-template-columns: 1fr; } .lang-choice { flex-direction: row; justify-content: center; gap: 12px; } }
+
+/* longer Hindi/Telugu labels: keep the top bar on one line */
+:lang(hi) .an-link, :lang(te) .an-link { padding: 8px 10px; font-size: 0.9rem; }
+@media (max-width: 1560px) { .an-user small { display: none; } }
+@media (max-width: 1480px) { :lang(te) .an-user strong, :lang(hi) .an-user strong { display: none; } :lang(te) .an-user, :lang(hi) .an-user { padding-right: 4px; } }
+.btn-sm { min-height: 40px; }
+
+.an-mlang { display: none; }
+@media (max-width: 760px) { .an-mlang { display: block; margin-left: auto; } .an-mlang + .an-burger { margin-left: 4px; } .an-mlang .lang-switch button { min-width: 38px; padding: 0 8px; } }

@@ -1,3 +1,0 @@
-{ "name": "JanSetu", "short_name": "JanSetu", "start_url": "/report", "display": "standalone",
-  "background_color": "#F8FAFC", "theme_color": "#0F172A",
-  "icons": [{ "src": "/favicon.svg", "sizes": "any", "type": "image/svg+xml" }] }

@@ -3,7 +3,7 @@ from sqlalchemy.orm import Session
 
 from app.core.config import settings
 from app.core.database import get_db
-from app.models import Area, Country
+from app.models import Area
 from app.schemas.serializers import area_out
 from app.services.ai import bhashini
 from app.services.ai.language import LANGUAGES, SPEECH_TAGS
@@ -22,8 +22,8 @@ def meta(db: Session = Depends(get_db)):
     return {
         "sectors": {k: {"label": v["label"], "sdg": v["sdg"]} for k, v in SECTORS.items()},
         "languages": LANGUAGES, "speech_tags": SPEECH_TAGS,
-        "countries": [{"code": c.code, "name": c.name, "currency": c.currency, "node_status": c.node_status,
-                       "languages": c.languages} for c in db.query(Country).all()],
+        "states": sorted({a.state for a in db.query(Area).all()}),
+        "districts": sorted({(a.state, a.district) for a in db.query(Area).all()}),
         "capabilities": {
             "llm": settings.llm_enabled, "llm_provider": settings.llm_provider if settings.llm_enabled else "offline rules",
             "asr": settings.asr_provider, "bhashini": bhashini.enabled(),
@@ -34,8 +34,8 @@ def meta(db: Session = Depends(get_db)):
 
 
 @router.get("/areas")
-def areas(country: str | None = None, db: Session = Depends(get_db)):
+def areas(state: str | None = None, country: str | None = None, db: Session = Depends(get_db)):
     q = db.query(Area)
-    if country:
-        q = q.filter(Area.country_code == country)
-    return [area_out(a) for a in q.order_by(Area.country_code, Area.district, Area.name).all()]
+    if state:
+        q = q.filter(Area.state == state)
+    return [area_out(a) for a in q.order_by(Area.state, Area.district, Area.name).all()]

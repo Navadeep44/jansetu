@@ -1,4 +1,4 @@
-"""Auto-generated policy brief for a country / state / district. Deterministic template
+"""Auto-generated policy brief for India / a state / a district. Deterministic template
 (always works); if an LLM is configured it adds an executive narrative and can translate."""
 from datetime import datetime
 
@@ -8,22 +8,19 @@ from app.models import Project
 from app.services import impact, providers_proxy, scoring, trends
 from app.services.ai.lexicon import SECTORS
 
-COUNTRY = {"IN": "India", "BR": "Brazil", "ZA": "South Africa"}
-
-
-def build(db: Session, country: str, district: str | None = None, language: str = "en") -> dict:
-    rows = [r for r in scoring.need_gap(db) if r["country"] == country and (not district or r["district"] == district)]
+def build(db: Session, state: str | None = None, district: str | None = None, language: str = "en") -> dict:
+    rows = [r for r in scoring.need_gap(db) if (not state or r["state"] == state) and (not district or r["district"] == district)]
     silent = [r for r in rows if r["silent_zone"]][:5]
     top = rows[:8]
-    recs = [p for p in db.query(Project).filter(Project.source == "recommended", Project.country_code == country)
-            .order_by(Project.score.desc()).all() if not district or (p.area and p.area.district == district)][:8]
-    al = scoring.alignment(db, country).get(country, {})
+    recs = [p for p in db.query(Project).filter(Project.source == "recommended").order_by(Project.score.desc()).all()
+            if (not district or (p.area and p.area.district == district)) and (not state or (p.area and p.area.state == state))][:8]
+    al = (scoring.alignment(db, state=state).get(state, {}) if state else scoring.alignment(db, national=True).get("India", {}))
     al_list = al.get("misaligned_projects", [])
     if district:
         al_list = [m for m in al_list if any(r["area"] == m["area"] for r in rows)]
-    alerts = [a for a in trends.alerts(db, country) if not district or a["district"] == district][:5]
-    imp = impact.project_impacts(db, country)[:5]
-    scope = f"{district} district, {COUNTRY.get(country, country)}" if district else COUNTRY.get(country, country)
+    alerts = [a for a in trends.alerts(db, state=state) if not district or a["district"] == district][:5]
+    imp = [i for i in impact.project_impacts(db) if not state or i["state"] == state][:5]
+    scope = f"{district} district, {state or 'India'}" if district else (state or "India")
     sectors = {}
     for r in rows:
         s = sectors.setdefault(r["sector"], {"reports": 0, "ngi": []})
@@ -44,7 +41,7 @@ def build(db: Session, country: str, district: str | None = None, language: str 
         "sector_table": sector_table,
         "top_needs": [{k: r[k] for k in ("area", "district", "sector", "ngi", "deficit", "effective_households")} for r in top],
         "silent_zones": [{k: r[k] for k in ("area", "district", "sector", "deficit", "vulnerability", "silent_score")} for r in silent],
-        "recommended_projects": [{"code": p.code, "title": p.title, "scheme": p.scheme, "cost_usd": p.cost_usd,
+        "recommended_projects": [{"code": p.code, "title": p.title, "scheme": p.scheme, "cost_local": p.cost_local, "area": p.area.name if p.area else "",
                                   "beneficiaries": p.beneficiaries, "score": p.score, "status": p.status} for p in recs],
         "misaligned_spending": al_list[:6],
         "alerts": alerts,

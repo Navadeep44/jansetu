@@ -16,7 +16,7 @@ class Settings(BaseSettings):
     allow_role_header: bool = False  # tests / local scripts only
 
     # Deployment node identity (federated: one instance per country)
-    node_country: str = "ALL"  # "IN", "BR", "ZA" ... or "ALL" for the multi-country demo node
+    node_country: str = "IN"
 
     # LLM provider: none | openai | anthropic | gemini  (openai also covers any
     # OpenAI-compatible server: Groq, Together, Ollama, vLLM, Sarvam, etc.)
@@ -43,14 +43,12 @@ class Settings(BaseSettings):
     twilio_auth_token: str = ""
     public_base_url: str = "http://localhost:8000"
 
-    # Privacy for the BRICS federated layer
+    # Privacy for open-data exports (k-anonymity, optional differential privacy)
     k_anonymity: int = 5
     dp_epsilon: float = 0.0  # 0 disables differential-privacy noise
 
     # Approximate FX for cross-country comparison (illustrative, update from a feed in prod)
     fx_inr_usd: float = 0.0115
-    fx_brl_usd: float = 0.18
-    fx_zar_usd: float = 0.055
 
     @property
     def llm_enabled(self) -> bool:

@@ -21,14 +21,14 @@ router = APIRouter(tags=["requests"])
 
 
 @router.get("/requests")
-def list_requests(status: str | None = None, country: str | None = None, area_id: int | None = None,
+def list_requests(status: str | None = None, country: str | None = None, state: str | None = None, area_id: int | None = None,
                   category: str | None = None, flag: str | None = None, q: str | None = None, channel: str | None = None,
                   limit: int = 50, offset: int = 0, role: str = Depends(require(*GOV_ROLES)), db: Session = Depends(get_db)):
     qry = db.query(CitizenRequest)
     if status:
         qry = qry.filter(CitizenRequest.status.in_(status.split(",")))
-    if country:
-        qry = qry.filter(CitizenRequest.country_code == country)
+    if state:
+        qry = qry.join(Area, CitizenRequest.area_id == Area.id).filter(Area.state == state)
     if area_id:
         qry = qry.filter(CitizenRequest.area_id == area_id)
     if category:
@@ -236,7 +236,7 @@ def close(request_id: int, body: CloseIn, role: str = Depends(require(*GOV_ROLES
 
 
 @router.get("/audit-log")
-def audit_log(limit: int = 100, role: str = Depends(require(*GOV_ROLES, "brics_analyst")), db: Session = Depends(get_db)):
+def audit_log(limit: int = 100, role: str = Depends(require(*GOV_ROLES)), db: Session = Depends(get_db)):
     rows = db.query(AuditLog).order_by(AuditLog.created_at.desc()).limit(limit).all()
     return [{"id": a.id, "actor_role": a.actor_role, "action": a.action, "entity": a.entity, "entity_id": a.entity_id,
              "detail": a.detail, "at": iso(a.created_at)} for a in rows]

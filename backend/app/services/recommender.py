@@ -10,24 +10,21 @@ from app.models import Area, CitizenRequest, DemandCluster, Project
 from app.services import analytics_cache, scoring
 from app.services.ai.lexicon import SECTORS
 
-CURRENCY = {"IN": "INR", "BR": "BRL", "ZA": "ZAR"}
+CURRENCY = {"IN": "INR"}
 
 
 def to_usd(amount: float, country: str) -> float:
-    rate = {"IN": settings.fx_inr_usd, "BR": settings.fx_brl_usd, "ZA": settings.fx_zar_usd}.get(country, 1.0)
+    rate = settings.fx_inr_usd
     return round(amount * rate, 0)
 
 
 SCHEMES = {
-    "IN": {"water": "Jal Jeevan Mission + 15th FC tied grant", "roads": "PMGSY (rural) / State PWD capital works",
-           "electricity": "RDSS feeder upgrade + PM-KUSUM solar", "health": "NHM - Ayushman Arogya Mandir upgrade",
-           "education": "Samagra Shiksha - additional classrooms", "sanitation": "Swachh Bharat Mission Ph-II / AMRUT 2.0"},
-    "BR": {"water": "Novo PAC - Água para Todos", "roads": "Novo PAC Cidades - pavimentação e drenagem",
-           "electricity": "Iluminação pública (COSIP) / Luz para Todos", "health": "Novo PAC Saúde - UBS",
-           "education": "Novo PAC - Creches e Escolas", "sanitation": "Novo PAC - Saneamento"},
-    "ZA": {"water": "Water Services Infrastructure Grant (WSIG)", "roads": "Municipal Infrastructure Grant (MIG)",
-           "electricity": "Integrated National Electrification Programme (INEP)", "health": "Health Facility Revitalisation Grant",
-           "education": "Education Infrastructure Grant (EIG)", "sanitation": "Urban Settlements Development Grant (USDG)"},
+    "IN": {"water": "Jal Jeevan Mission + VB-GRAMG water-security works + 15th FC tied grant",
+           "roads": "PMGSY-IV (rural) / VB-GRAMG connectivity works / State PWD",
+           "electricity": "RDSS feeder upgrade + PM-KUSUM / PM Surya Ghar solar",
+           "health": "NHM - Ayushman Arogya Mandir upgrade",
+           "education": "Samagra Shiksha - classrooms, toilets and teacher posts",
+           "sanitation": "Swachh Bharat Mission (G) Ph-II / AMRUT 2.0"},
 }
 
 SHARE = {"water": 1.0, "roads": 1.0, "electricity": 0.9, "health": 1.0, "education": 0.25, "sanitation": 0.9}
@@ -38,14 +35,8 @@ def estimate(area: Area, sector: str, sub: str, deficit: float) -> tuple[str, st
     share = SHARE[sector] * (0.45 if sector == "roads" and area.setting == "urban" else 1.0)
     ben = max(50, int(area.population * min(1.0, deficit + 0.1) * share))
     km = round(min(12, max(1.5, 2 + deficit * 8 * (0.5 if area.setting == "urban" else 1))), 1)
-    unit = {
-        "IN": {"roads": km * 8.0e6, "water": ben * 4500, "electricity": ben * 2500, "health": 2.5e7 * (0.5 + deficit),
-               "education": math.ceil(ben / 40) * 1.5e6, "sanitation": ben * 3000},
-        "BR": {"roads": km * 1.2e6, "water": ben * 900, "electricity": ben * 400, "health": 4.0e6 * (0.5 + deficit),
-               "education": 3.5e6 * (0.5 + deficit), "sanitation": ben * 1200},
-        "ZA": {"roads": km * 6.0e6, "water": ben * 3000, "electricity": ben * 2000, "health": 3.0e7 * (0.5 + deficit),
-               "education": 2.5e7 * (0.5 + deficit), "sanitation": ben * 2500},
-    }.get(c, {})
+    unit = {"roads": km * 8.0e6, "water": ben * 4500, "electricity": ben * 2500, "health": 2.5e7 * (0.5 + deficit),
+            "education": math.ceil(ben / 40) * 1.5e6, "sanitation": ben * 3000}
     cost = round(unit.get(sector, ben * 1000), -3)
     n = area.name
     title = {
@@ -56,7 +47,7 @@ def estimate(area: Area, sector: str, sub: str, deficit: float) -> tuple[str, st
         ("electricity", "new_connection"): f"Household electrification + solar mini-grid, {n}",
         ("water", "water_quality"): f"Water treatment and safe-supply upgrade, {n}",
         ("health", "medicine_stockout"): f"Essential-medicines supply chain fix, {n}",
-        ("education", "capacity"): f"New creche / classroom places, {n}",
+        ("education", "capacity"): f"New Anganwadi / classroom places, {n}",
         ("sanitation", "solid_waste"): f"Door-to-door waste collection and transfer point, {n}",
         ("sanitation", "toilets"): f"Community and household toilets programme, {n}",
     }.get((sector, sub)) or {
@@ -85,7 +76,7 @@ def _evidence(db: Session, area_id: int, sector: str, limit: int = 4):
     return out
 
 
-def regenerate(db: Session, min_ngi: float = 40.0, per_country: int = 25) -> int:
+def regenerate(db: Session, min_ngi: float = 40.0, per_state: int = 12) -> int:
     """Rebuild the 'recommended' shortlist. Human decisions (approved / deferred / rejected) are kept."""
     db.query(Project).filter(Project.source == "recommended", Project.status == "recommended").delete()
     db.flush()
@@ -96,9 +87,10 @@ def regenerate(db: Session, min_ngi: float = 40.0, per_country: int = 25) -> int
     by_country: dict[str, list] = {}
     for r in rows:
         if r["ngi"] >= min_ngi and r["covered"] == 0 and (r["area_id"], r["sector"]) not in decided:
-            by_country.setdefault(r["country"], []).append(r)
-    for country, cand in by_country.items():
-        cand = cand[:per_country]
+            by_country.setdefault(r["state"], []).append(r)
+    country = "IN"
+    for _state, cand in by_country.items():
+        cand = cand[:per_state]
         drafts = []
         for r in cand:
             area = db.get(Area, r["area_id"])

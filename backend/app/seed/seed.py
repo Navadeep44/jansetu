@@ -1,5 +1,5 @@
-"""Builds the demo dataset: 3 live BRICS nodes (India, Brazil, South Africa) with ~50 planning
-areas, several thousand multilingual citizen requests over 12 months, existing investment plans,
+"""Builds the India demo dataset: 5 states (Telangana, Odisha, Delhi, Bihar, Uttar Pradesh), 6 districts and 50 planning
+areas across Telugu, Hindi, Odia and Bhojpuri speaking regions, with several thousand multilingual citizen requests over 12 months, existing investment plans,
 completed projects for impact measurement, and injected events (disease spike, power-cut
 anger, coordinated campaign) so every feature can be demonstrated.
 
@@ -31,9 +31,6 @@ _EXTRACT_CACHE: dict = {}
 CHANNELS = {
     ("IN", "rural"): {"ivr": 30, "whatsapp": 22, "assisted": 25, "sms": 10, "web": 5, "telegram": 3, "community": 5},
     ("IN", "urban"): {"whatsapp": 42, "web": 20, "ivr": 15, "sms": 10, "telegram": 6, "assisted": 7},
-    ("BR", "urban"): {"whatsapp": 48, "web": 22, "import": 18, "ivr": 6, "telegram": 6},
-    ("BR", "rural"): {"whatsapp": 45, "ivr": 20, "web": 15, "assisted": 20},
-    ("ZA", "urban"): {"whatsapp": 58, "ivr": 15, "sms": 12, "web": 10, "assisted": 5},
 }
 
 PLANS = [
@@ -48,21 +45,18 @@ PLANS = [
     ("PLAN-IN-008", "Jahangirpuri", "water", "Piped water network and ATM water kiosks, Jahangirpuri", 14e7, "completed", 120000, 330, 150),
     ("PLAN-IN-009", "Indervelly", "roads", "PMGSY all-weather road link, Indervelly (6.2 km)", 6.4e7, "completed", 21000, 400, 210),
     ("PLAN-IN-010", "Sangam Vihar", "water", "Piped water network phase 2, Sangam Vihar", 40e7, "in_progress", 250000, 120, None),
-    ("PLAN-BR-001", "Moema", "roads", "Recapeamento de vias, Moema", 22e6, "sanctioned", 60000, None, None),
-    ("PLAN-BR-002", "Pinheiros", "electricity", "Nova iluminação LED, Pinheiros", 8e6, "planned", 45000, None, None),
-    ("PLAN-BR-003", "Vila Mariana", "roads", "Requalificação de calçadas, Vila Mariana", 12e6, "planned", 70000, None, None),
-    ("PLAN-BR-004", "Grajaú", "sanitation", "Canalização de córrego e coleta de esgoto, Grajaú", 35e6, "in_progress", 110000, 90, None),
-    ("PLAN-BR-005", "Capão Redondo", "sanitation", "Rede de esgoto e drenagem, Capão Redondo", 28e6, "completed", 95000, 360, 180),
-    ("PLAN-BR-006", "Jardim Ângela", "health", "Nova UBS, Jardim Ângela", 6e6, "sanctioned", 40000, None, None),
-    ("PLAN-ZA-001", "Sandton", "roads", "Road resurfacing, Sandton CBD", 60e6, "sanctioned", 90000, None, None),
-    ("PLAN-ZA-002", "Midrand", "electricity", "Smart street-lighting, Midrand", 25e6, "planned", 60000, None, None),
-    ("PLAN-ZA-003", "Diepsloot", "water", "Bulk water pipeline phase 1, Diepsloot", 120e6, "in_progress", 150000, 100, None),
-    ("PLAN-ZA-004", "Alexandra", "electricity", "Electrification and illegal-connection regularisation, Alexandra", 45e6, "completed", 110000, 320, 150),
-    ("PLAN-ZA-005", "Soweto", "electricity", "Substation refurbishment, Soweto", 80e6, "planned", 400000, None, None),
+    ("PLAN-IN-011", "Banjara Hills", "roads", "Road resurfacing and decorative lighting, Banjara Hills", 15e7, "sanctioned", 18000, None, None),
+    ("PLAN-IN-012", "Jubilee Hills", "roads", "Junction beautification and footpaths, Jubilee Hills", 8e7, "planned", 15000, None, None),
+    ("PLAN-IN-013", "Chandrayangutta", "sanitation", "Underground drainage and nala lining, Chandrayangutta", 22e7, "completed", 150000, 360, 170),
+    ("PLAN-IN-014", "Gaya Town", "roads", "Riverfront promenade and road widening, Gaya", 20e7, "sanctioned", 60000, None, None),
+    ("PLAN-IN-015", "Sherghati", "electricity", "New 33/11 kV substation and feeder separation, Sherghati", 9e7, "completed", 120000, 380, 190),
+    ("PLAN-IN-016", "Bodh Gaya", "health", "CHC upgrade and new labour room, Bodh Gaya", 4e7, "in_progress", 90000, 80, None),
+    ("PLAN-IN-017", "Bahraich Town", "roads", "Ring road and flyover, Bahraich", 25e7, "planned", 50000, None, None),
+    ("PLAN-IN-018", "Kaiserganj", "water", "Jal Jeevan Mission piped supply, Kaiserganj", 12e7, "in_progress", 140000, 110, None),
 ]
-IMPROVED = {("Jahangirpuri", "water"): 0.40, ("Indervelly", "roads"): 0.30, ("Capão Redondo", "sanitation"): 0.32,
-            ("Alexandra", "electricity"): 0.40}
-SPIKES = [("Seelampur", "sanitation", 16), ("Soweto", "electricity", 24), ("Diepsloot", "water", 12)]
+IMPROVED = {("Jahangirpuri", "water"): 0.40, ("Indervelly", "roads"): 0.30, ("Chandrayangutta", "sanitation"): 0.22,
+            ("Sherghati", "electricity"): 0.40}
+SPIKES = [("Seelampur", "sanitation", 16), ("Malakpet", "electricity", 22), ("Jainoor", "health", 12), ("Gaya Town", "water", 12)]
 GOOD_CLOSURE = {
     "water": "Borewell repaired and piped supply commissioned; water tested safe by the district lab.",
     "roads": "All-weather road laid and culvert constructed; bus service restored.",
@@ -93,7 +87,7 @@ def _lang_for(area: Area, sector: str) -> str:
 def _make(db, area, sector, template, created, hh_id, channel=None, supporters=1, flags=None):
     lang, _, text, english = template
     x = _extract(text)
-    channel = channel or _pick(CHANNELS.get((area.country_code, area.setting), CHANNELS[("ZA", "urban")]))
+    channel = channel or _pick(CHANNELS.get((area.country_code, area.setting), CHANNELS[("IN", "urban")]))
     female_p = 0.6 if channel in ("assisted", "community") else 0.42
     roll = RNG.random()
     gender = "female" if roll < female_p else ("male" if roll < 0.92 else "undisclosed")
@@ -107,8 +101,7 @@ def _make(db, area, sector, template, created, hh_id, channel=None, supporters=1
         sdg=sector_sdg(sector), confidence=max(0.55, x["confidence"]),
         extraction_mode="rules", household_hash=privacy.household_hash(f"hh-{area.id}-{hh_id}"),
         anonymous=RNG.random() < 0.08, gender=gender,
-        assisted_by=(f"ASHA-{area.id:03d}-{RNG.randint(1, 9)}" if channel == "assisted" and area.country_code == "IN"
-                     else f"CHW-{area.id:03d}" if channel == "assisted" else None),
+        assisted_by=(f"ASHA-{area.id:03d}-{RNG.randint(1, 9)}" if channel == "assisted" else None),
         supporters=supporters, flags=list(flags or []), status="clustered", created_at=created, updated_at=created,
     )
     r.area = area
@@ -172,7 +165,7 @@ def run():
             requests.append(_make(db, a, sector, tpl, NOW - timedelta(days=RNG.uniform(0, 6)), 5000 + i))
 
     # coordinated campaign (anti-gaming demo): identical text, many 'households', within hours
-    vm = areas["Vila Mariana"]
+    vm = areas["Jubilee Hills"]
     base = NOW - timedelta(days=9)
     for i in range(14):
         requests.append(_make(db, vm, "roads", CAMPAIGN, base + timedelta(minutes=17 * i), 9000 + i, channel="whatsapp", flags=["coordinated"]))
@@ -219,7 +212,7 @@ def run():
     for code, aname, sector, title, cost, status, ben, started, completed in PLANS:
         a = areas[aname]
         p = Project(code=code, source="plan", country_code=a.country_code, area_id=a.id, sector=sector, title=title,
-                    description=f"Existing public investment plan item ({'GPDP / state budget' if a.country_code == 'IN' else 'PPA / municipal budget' if a.country_code == 'BR' else 'Municipal IDP'}).",
+                    description=f"Existing public investment plan item ({'Viksit Gram Panchayat Plan / state budget' if a.setting == 'rural' else 'Municipal / state budget'}).",
                     scheme=recommender.SCHEMES[a.country_code][sector], sdg=sector_sdg(sector), cost_local=cost,
                     cost_usd=recommender.to_usd(cost, a.country_code), beneficiaries=ben, status=status,
                     created_at=NOW - timedelta(days=(started or 60) + 30),
@@ -252,9 +245,9 @@ def run():
     # a handful of items needing human review (low confidence / urgent safety / no location)
     review_msgs = [
         ("en", "Please help us sir, nobody listens to us here.", ["low_confidence"], "Utnoor"),
-        ("en", "Electric wire fallen on the road near the school, children could be electrocuted!", ["urgent_safety"], "Soweto"),
+        ("en", "Electric wire fallen on the road near the school, children could be electrocuted!", ["urgent_safety"], "Chandrayangutta"),
         ("hi", "साहब हमारी कोई नहीं सुनता, कृपया मदद करें।", ["low_confidence"], "Seelampur"),
-        ("pt", "Ninguém resolve nada aqui, estamos abandonados.", ["low_confidence"], "Grajaú"),
+        ("te", "సార్, ఇక్కడ మా మాట ఎవరూ వినడం లేదు, దయచేసి సహాయం చేయండి.", ["low_confidence"], "Amberpet"),
     ]
     for lang, text, flags, aname in review_msgs:
         a = areas[aname]
@@ -278,8 +271,8 @@ def run():
     demo = [
         ("JS-IN-LAKSH1", "Narnoor", "roads", BY_LANG[("te", "roads")][0], "assisted", 40, "female"),
         ("JS-IN-RAMES1", "Bawana", "sanitation", BY_LANG[("bho", "sanitation")][0], "ivr", 55, "male"),
-        ("JS-BR-MARIA1", "Capão Redondo", "electricity", BY_LANG[("pt", "electricity")][0], "whatsapp", 30, "female"),
-        ("JS-ZA-THAND1", "Soweto", "electricity", BY_LANG[("zu", "electricity")][0], "whatsapp", 3, "female"),
+        ("JS-IN-SUNIT1", "Mihinpurwa", "health", BY_LANG[("hi", "health")][0], "assisted", 30, "female"),
+        ("JS-IN-PRIYA1", "Malakpet", "electricity", BY_LANG[("te", "electricity")][0], "whatsapp", 3, "female"),
     ]
     demo_reqs = {}
     for tid, aname, sector, tpl, ch, days, gender in demo:
@@ -320,9 +313,12 @@ def run():
                             message=t("in_plan", lak.language, tid=lak.tracking_id, project=rec_clusters[lak.cluster_id].title),
                             delivered=True, created_at=NOW - timedelta(days=2)))
     lak_pid = rec_clusters[lak.cluster_id].id if lak and lak.cluster_id in rec_clusters else -1
-    for country, reason in (("IN", "Highest need-gap in district; convergence with PMGSY confirmed by DRDA."),
-                            ("BR", "Aprovado no ciclo do PPA; alinhado ao Novo PAC.")):
-        top = next((p for p in recs if p.country_code == country and p.id != lak_pid), None)
+    used = {lak_pid}
+    for state, reason in (("Odisha", "Highest need-gap in district; convergence with PMGSY confirmed by DRDA."),
+                          ("Bihar", "Approved in Gram Sabha; included in the Viksit Gram Panchayat Plan with VB-GRAMG works.")):
+        top = next((p for p in recs if p.area and p.area.state == state and p.id not in used), None)
+        if top:
+            used.add(top.id)
         if top:
             top.status, top.decision_reason, top.decided_by = "approved", reason, "district"
             db.add(AuditLog(actor_role="district", action="approve_project", entity="project", entity_id=top.code,

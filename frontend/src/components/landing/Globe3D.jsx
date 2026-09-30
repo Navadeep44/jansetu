@@ -1,5 +1,5 @@
-// 3D hero globe (React Three Fiber): real continents as glowing dots, BRICS countries highlighted,
-// a fresnel atmosphere, pulsing capital markers and data pulses travelling along the arcs.
+// 3D hero globe (React Three Fiber): real continents as glowing dots with India highlighted,
+// a fresnel atmosphere, pulsing markers on the pilot districts and data pulses travelling to New Delhi.
 import { useMemo, useRef } from 'react'
 import { Canvas, useFrame, useThree } from '@react-three/fiber'
 import { Line } from '@react-three/drei'
@@ -7,18 +7,15 @@ import * as THREE from 'three'
 import LAND from './landDots.json'
 
 const R = 1.6
-const COLORS = { land: '#4f6f9c', member: '#38bdf8', live: '#fbbf24' }
+const COLORS = { land: '#3d5a85', india: '#7dd3fc', live: '#fbbf24', member: '#7dd3fc' }
+// New Delhi (national planners) + the pilot districts across India's language regions
 const NODES = [
-  { name: 'New Delhi', lat: 28.6, lng: 77.2, live: true },
-  { name: 'Brasília', lat: -15.8, lng: -47.9, live: true },
-  { name: 'Pretoria', lat: -25.7, lng: 28.2, live: true },
-  { name: 'Moscow', lat: 55.75, lng: 37.6 },
-  { name: 'Beijing', lat: 39.9, lng: 116.4 },
-  { name: 'Cairo', lat: 30.0, lng: 31.2 },
-  { name: 'Addis Ababa', lat: 9.0, lng: 38.7 },
-  { name: 'Tehran', lat: 35.7, lng: 51.4 },
-  { name: 'Abu Dhabi', lat: 24.45, lng: 54.4 },
-  { name: 'Jakarta', lat: -6.2, lng: 106.8 },
+  { name: 'New Delhi', lat: 28.61, lng: 77.21, hub: true },
+  { name: 'Adilabad', lat: 19.67, lng: 78.53, live: true },
+  { name: 'Hyderabad', lat: 17.39, lng: 78.49, live: true },
+  { name: 'Koraput', lat: 18.81, lng: 82.71, live: true },
+  { name: 'Gaya', lat: 24.79, lng: 85.0, live: true },
+  { name: 'Bahraich', lat: 27.57, lng: 81.6, live: true },
 ]
 
 function toVec(lat, lng, r = R) {
@@ -70,13 +67,13 @@ function LandDots() {
   const { positions, colors, sizes } = useMemo(() => {
     const n = LAND.length / 3
     const pos = new Float32Array(n * 3), col = new Float32Array(n * 3), siz = new Float32Array(n)
-    const pal = [new THREE.Color(COLORS.land), new THREE.Color(COLORS.member), new THREE.Color(COLORS.live)]
+    const pal = [new THREE.Color(COLORS.land), new THREE.Color(COLORS.india)]
     for (let i = 0; i < n; i++) {
       const v = toVec(LAND[i * 3] / 10, LAND[i * 3 + 1] / 10, R * 1.004)
       pos.set([v.x, v.y, v.z], i * 3)
       const c = pal[LAND[i * 3 + 2]]
       col.set([c.r, c.g, c.b], i * 3)
-      siz[i] = LAND[i * 3 + 2] ? 3.1 : 2.6
+      siz[i] = LAND[i * 3 + 2] ? 3.6 : 2.4
     }
     return { positions: pos, colors: col, sizes: siz }
   }, [])
@@ -97,7 +94,7 @@ function Marker({ node, index, reduced }) {
   const rings = [useRef(), useRef()]
   const pos = useMemo(() => toVec(node.lat, node.lng, R * 1.012), [node])
   const quat = useMemo(() => new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 0, 1), pos.clone().normalize()), [pos])
-  const color = node.live ? COLORS.live : COLORS.member
+  const color = node.hub ? '#ffffff' : COLORS.live
   useFrame(({ clock }) => {
     rings.forEach((r, k) => {
       if (!r.current) return
@@ -106,7 +103,7 @@ function Marker({ node, index, reduced }) {
       r.current.material.opacity = (1 - t) * 0.7
     })
   })
-  const s = node.live ? 1 : 0.72
+  const s = node.hub ? 1.15 : 0.8
   return (
     <group position={pos} quaternion={quat}>
       <mesh><circleGeometry args={[0.028 * s, 24]} /><meshBasicMaterial color={color} toneMapped={false} /></mesh>
@@ -125,7 +122,7 @@ function Arc({ from, to, color, speed, offset, reduced }) {
     const a = toVec(from.lat, from.lng, R * 1.01)
     const b = toVec(to.lat, to.lng, R * 1.01)
     const mid = a.clone().add(b).multiplyScalar(0.5)
-    const lift = R + a.distanceTo(b) * 0.38
+    const lift = R + 0.06 + a.distanceTo(b) * 0.55
     return new THREE.QuadraticBezierCurve3(a, mid.normalize().multiplyScalar(lift), b)
   }, [from, to])
   const points = useMemo(() => curve.getPoints(64), [curve])
@@ -162,23 +159,26 @@ function Stars() {
   )
 }
 
+const BASE_Y = -3.22 // India faces the viewer
 function Earth({ reduced }) {
   const group = useRef()
-  useFrame(({ pointer }, delta) => {
+  useFrame(({ pointer, clock }) => {
     if (!group.current) return
-    if (!reduced) group.current.rotation.y += delta * 0.07
-    group.current.rotation.x = THREE.MathUtils.lerp(group.current.rotation.x, 0.32 + pointer.y * 0.12, 0.05)
+    // gentle sway around India instead of spinning India away
+    const sway = reduced ? 0 : Math.sin(clock.elapsedTime * 0.18) * 0.32
+    group.current.rotation.y = THREE.MathUtils.lerp(group.current.rotation.y, BASE_Y + sway + pointer.x * 0.25, 0.05)
+    group.current.rotation.x = THREE.MathUtils.lerp(group.current.rotation.x, 0.36 + pointer.y * 0.12, 0.05)
     group.current.rotation.z = THREE.MathUtils.lerp(group.current.rotation.z, -pointer.x * 0.06, 0.05)
   })
   const hub = NODES[0]
   return (
     // start with India facing the viewer
-    <group ref={group} rotation={[0.32, -3.12, 0]}>
+    <group ref={group} rotation={[0.36, BASE_Y, 0]}>
       <mesh><sphereGeometry args={[R, 96, 96]} /><shaderMaterial args={[oceanShader]} /></mesh>
       <LandDots />
       {NODES.map((n, i) => <Marker key={n.name} node={n} index={i} reduced={reduced} />)}
       {NODES.slice(1).map((n, i) => (
-        <Arc key={n.name} from={hub} to={n} color={n.live ? COLORS.live : COLORS.member} speed={0.22 + (i % 3) * 0.06} offset={i * 0.17} reduced={reduced} />
+        <Arc key={n.name} from={n} to={hub} color={COLORS.live} speed={0.35 + (i % 3) * 0.08} offset={i * 0.2} reduced={reduced} />
       ))}
     </group>
   )
@@ -187,7 +187,7 @@ function Earth({ reduced }) {
 export default function Globe3D() {
   const reduced = typeof window !== 'undefined' && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
   return (
-    <Canvas dpr={[1, 2]} camera={{ position: [0, 0, 5.2], fov: 45 }} gl={{ antialias: true, alpha: true }} aria-label="3D globe: BRICS countries connected by JanSetu">
+    <Canvas dpr={[1, 2]} camera={{ position: [0, 0, 4.6], fov: 45 }} gl={{ antialias: true, alpha: true }} aria-label="3D globe: India's pilot districts connected to national planners in New Delhi">
       <Stars />
       <mesh scale={1.16}><sphereGeometry args={[R, 64, 64]} /><shaderMaterial args={[atmoShader]} side={THREE.BackSide} blending={THREE.AdditiveBlending} transparent depthWrite={false} /></mesh>
       <Earth reduced={reduced} />

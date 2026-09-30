@@ -3,9 +3,9 @@
 NGI(area, sector) = 100 * (wD*Demand + wS*SupplyDeficit + wV*Vulnerability + wX*Severity) / sum(w)
                         * (1 - wC * PlannedCoverage)
 
- Demand         = percentile (within country) of effective households reporting per 1,000 households,
+ Demand         = national percentile of effective households reporting per 1,000 households,
                   divided by reporting propensity (connectivity) so low-connectivity places are not penalised
- SupplyDeficit  = 1 - infrastructure provisioning score (Mission Antyodaya / IBGE / Stats SA style)
+ SupplyDeficit  = 1 - infrastructure provisioning score (Mission Antyodaya / Yuktdhara style)
  Vulnerability  = composite of poverty, SC/ST / marginalised share, women-headed households, disaster risk
  Severity       = mean AI-extracted severity (life-safety > livelihood > convenience)
  PlannedCoverage= an active sanctioned/approved project already addresses this need (avoid double funding)
@@ -148,33 +148,31 @@ def area_summary(db: Session, weights: dict | None = None, sector: str | None = 
     return sorted(areas, key=lambda a: a["ngi_max"], reverse=True)
 
 
-def silent_zones(db: Session, country: str | None = None) -> list[dict]:
-    rows = [r for r in need_gap(db) if r["silent_zone"] and (not country or r["country"] == country)]
+def silent_zones(db: Session, country: str | None = None, state: str | None = None) -> list[dict]:
+    rows = [r for r in need_gap(db) if r["silent_zone"] and (not state or r["state"] == state)]
     rows.sort(key=lambda r: r["silent_score"], reverse=True)
     for r in rows:
         r["recommended_outreach"] = (
             "Deploy ASHA / CSC / community health worker door-to-door survey and an IVR missed-call campaign in "
-            f"{r['area']}; hold a ward/Gram Sabha listening session on {SECTORS[r['sector']]['label'].lower()}."
-            if r["country"] == "IN" else
-            f"Run an assisted listening campaign (community agents, IVR, WhatsApp broadcast) in {r['area']} on "
-            f"{SECTORS[r['sector']]['label'].lower()}.")
+            f"{r['area']}; hold a ward/Gram Sabha listening session on {SECTORS[r['sector']]['label'].lower()}.")
     return rows
 
 
-def alignment(db: Session, country: str | None = None) -> dict:
-    """How much of the existing public investment plan goes where need is highest?"""
+def alignment(db: Session, country: str | None = None, state: str | None = None, national: bool = False) -> dict:
+    """How much of the existing public investment plan goes where need is highest?
+    Result is keyed by state (or {"India": ...} when national=True). Need thresholds are national."""
     rows = need_gap(db, {"coverage": 0.0})  # judge need before crediting the plan itself
     idx = {(r["area_id"], r["sector"]): r for r in rows}
     result = {}
-    countries = sorted({r["country"] for r in rows if not country or r["country"] == country})
+    ngis = sorted(r["ngi"] for r in rows)
+    if not ngis:
+        return result
+    q75 = ngis[int(0.75 * (len(ngis) - 1))]
+    median = ngis[int(0.5 * (len(ngis) - 1))]
     plans = db.query(Project).filter(Project.source == "plan", Project.status.in_(["planned", "sanctioned", "in_progress"])).all()
-    for c in countries:
-        ngis = sorted(r["ngi"] for r in rows if r["country"] == c)
-        if not ngis:
-            continue
-        q75 = ngis[int(0.75 * (len(ngis) - 1))]
-        median = ngis[int(0.5 * (len(ngis) - 1))]
-        cp = [p for p in plans if p.country_code == c]
+    groups = ["India"] if national else sorted({r["state"] for r in rows if not state or r["state"] == state})
+    for c in groups:
+        cp = [p for p in plans if national or (p.area and p.area.state == c)]
         total = sum(p.cost_local for p in cp) or 0.0
         top = sum(p.cost_local for p in cp if idx.get((p.area_id, p.sector), {}).get("ngi", 0) >= q75)
         low = [p for p in cp if idx.get((p.area_id, p.sector), {}).get("ngi", 0) < median]
@@ -188,8 +186,39 @@ def alignment(db: Session, country: str | None = None) -> dict:
             "misaligned_projects": [{
                 "id": p.id, "code": p.code, "title": p.title, "area": p.area.name if p.area else "", "sector": p.sector,
                 "cost_local": p.cost_local, "cost_usd": p.cost_usd, "status": p.status,
-                "need_ngi": idx.get((p.area_id, p.sector), {}).get("ngi", 0), "country_median_ngi": median,
+                "need_ngi": idx.get((p.area_id, p.sector), {}).get("ngi", 0), "national_median_ngi": median,
+                "state": p.area.state if p.area else "", "district": p.area.district if p.area else "",
             } for p in sorted(low, key=lambda p: p.cost_local, reverse=True)],
             "thresholds": {"top_quartile_ngi": q75, "median_ngi": median},
         }
     return result
+
+
+def states(db: Session) -> list[dict]:
+    """National view: one row per state for policymakers (drill down to districts)."""
+    rows = need_gap(db)
+    al = alignment(db)
+    out = {}
+    for r in rows:
+        s = out.setdefault(r["state"], {"state": r["state"], "districts": set(), "areas": set(), "reports": 0, "households": 0.0,
+                                        "ngi": [], "silent": 0, "lat": [], "lng": [], "population": {}, "sector_ngi": {}})
+        s["districts"].add(r["district"]); s["areas"].add(r["area_id"])
+        s["reports"] += r["reports"]; s["households"] += r["effective_households"]
+        s["ngi"].append(r["ngi"]); s["silent"] += int(r["silent_zone"])
+        s["lat"].append(r["lat"]); s["lng"].append(r["lng"]); s["population"][r["area_id"]] = r["population"]
+        s["sector_ngi"].setdefault(r["sector"], []).append(r["ngi"])
+        s.setdefault("sector_hh", {}).setdefault(r["sector"], 0.0)
+        s["sector_hh"][r["sector"]] += r["effective_households"] * (1 + r["deficit"])
+    res = []
+    for k, s in out.items():
+        sec = {q: round(sum(v) / len(v), 1) for q, v in s["sector_ngi"].items()}
+        # "biggest need" = what most families ask for, weighted by how bad the infrastructure is
+        top = max(s["sector_hh"], key=s["sector_hh"].get)
+        a = al.get(k, {})
+        res.append({"state": k, "districts": sorted(s["districts"]), "areas": len(s["areas"]), "reports": s["reports"],
+                    "households": round(s["households"]), "population": sum(s["population"].values()),
+                    "avg_ngi": round(sum(s["ngi"]) / len(s["ngi"]), 1), "max_ngi": max(s["ngi"]), "silent_zones": s["silent"],
+                    "top_sector": top, "sector_ngi": sec, "lat": round(sum(s["lat"]) / len(s["lat"]), 3),
+                    "lng": round(sum(s["lng"]) / len(s["lng"]), 3), "plan_budget": a.get("plan_budget_local", 0),
+                    "alignment_score": a.get("alignment_score")})
+    return sorted(res, key=lambda x: -x["avg_ngi"])

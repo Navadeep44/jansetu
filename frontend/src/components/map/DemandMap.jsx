@@ -1,16 +1,20 @@
 import { useEffect, useMemo } from 'react'
 import { CircleMarker, MapContainer, TileLayer, Tooltip, useMap } from 'react-leaflet'
-import { SECTORS, fmt, ngiColor } from '../../lib/format'
+import { SECTORS, fmt, money, ngiColor } from '../../lib/format'
+import { useT } from '../../i18n'
 
 export const REGIONS = {
-  all: { label: 'All nodes', center: [2, 30], zoom: 2 },
-  adilabad: { label: 'Adilabad (IN)', center: [19.5, 78.72], zoom: 9 },
-  koraput: { label: 'Koraput (IN)', center: [18.9, 82.8], zoom: 9 },
-  delhi: { label: 'Delhi (IN)', center: [28.64, 77.18], zoom: 11 },
-  saopaulo: { label: 'São Paulo (BR)', center: [-23.66, -46.6], zoom: 10 },
-  gauteng: { label: 'Gauteng (ZA)', center: [-26.15, 28.05], zoom: 9 },
+  all: { label: 'All India', center: [23.2, 81.0], zoom: 5 },
+  adilabad: { label: 'Adilabad, Telangana', center: [19.5, 78.72], zoom: 9 },
+  hyderabad: { label: 'Hyderabad, Telangana', center: [17.4, 78.46], zoom: 11 },
+  koraput: { label: 'Koraput, Odisha', center: [18.9, 82.8], zoom: 9 },
+  delhi: { label: 'Delhi', center: [28.64, 77.18], zoom: 11 },
+  gaya: { label: 'Gaya, Bihar', center: [24.62, 84.85], zoom: 9 },
+  bahraich: { label: 'Bahraich, Uttar Pradesh', center: [27.65, 81.6], zoom: 9 },
 }
-export const COUNTRY_REGION = { IN: 'adilabad', BR: 'saopaulo', ZA: 'gauteng', all: 'all' }
+// which map view to open when an official picks a state
+export const STATE_REGION = { all: 'all', Telangana: 'adilabad', Odisha: 'koraput', Delhi: 'delhi', Bihar: 'gaya', 'Uttar Pradesh': 'bahraich' }
+export const COUNTRY_REGION = STATE_REGION // legacy name
 
 const HOT = { hot_99: '#7f1d1d', hot_95: '#dc2626', hot_90: '#f59e0b', cold_95: '#0369a1', not_significant: '#94a3b8' }
 
@@ -33,10 +37,11 @@ export default function DemandMap({ areas = [], layer = 'ngi', region = 'all', s
   const maxPop = useMemo(() => Math.max(1, ...areas.map((a) => a.population || 1)), [areas])
   const planByArea = useMemo(() => {
     const m = {}
-    plans.forEach((p) => { m[p.area_id] = (m[p.area_id] || 0) + (p.cost_usd || 0) })
+    plans.forEach((p) => { m[p.area_id] = (m[p.area_id] || 0) + (p.cost_local || 0) })
     return m
   }, [plans])
   const r0 = REGIONS[region] || REGIONS.all
+  const t = useT()
 
   return (
     <div className={`map-box ${tall ? 'tall' : ''}`}>
@@ -69,11 +74,11 @@ export default function DemandMap({ areas = [], layer = 'ngi', region = 'all', s
               <Tooltip direction="top" offset={[0, -4]}>
                 <div style={{ minWidth: 180 }}>
                   <strong>{a.area}</strong> <span style={{ color: '#64748b' }}>{a.district}</span><br />
-                  Need-Gap Index: <strong>{ngi?.toFixed?.(0)}</strong>{a.top_sector ? ` · top: ${SECTORS[a.top_sector]?.short}` : ''}<br />
-                  Reports: {fmt(a.reports)} · per 1k HH: {a.demand_per_1000hh}<br />
-                  Hotspot Gi* z = {a.hotspot?.z} {a.hotspot?.class?.startsWith('hot') ? '(hot)' : ''}<br />
-                  {a.silent_zone && <span style={{ color: '#6d28d9', fontWeight: 600 }}>Silent zone: {a.silent_sectors.map((s) => SECTORS[s]?.short).join(', ')}</span>}
-                  {planByArea[a.area_id] ? <div>Planned investment: ${fmt(planByArea[a.area_id])}</div> : null}
+                  {t('Need level')}: <strong>{ngi?.toFixed?.(0)} / 100</strong>{a.top_sector ? ` · ${t('biggest need')}: ${t(SECTORS[a.top_sector]?.short)}` : ''}<br />
+                  {t('Reports')}: {fmt(a.reports)}<br />
+                  {a.hotspot?.class?.startsWith('hot') && <><span style={{ color: '#b91c1c', fontWeight: 600 }}>{t('Hotspot')}</span><br /></>}
+                  {a.silent_zone && <span style={{ color: '#6d28d9', fontWeight: 600 }}>{t('Silent area')}: {a.silent_sectors.map((s) => t(SECTORS[s]?.short)).join(', ')}</span>}
+                  {planByArea[a.area_id] ? <div>{t('Money already planned')}: {money(planByArea[a.area_id])}</div> : null}
                 </div>
               </Tooltip>
             </CircleMarker>
@@ -85,26 +90,27 @@ export default function DemandMap({ areas = [], layer = 'ngi', region = 'all', s
 }
 
 export function MapLegend({ layer }) {
+  const t = useT()
   if (layer === 'hotspot') return (
-    <div className="legend" aria-label="Legend">
-      <span><i className="legend-swatch" style={{ background: HOT.hot_99 }} />Hotspot 99%</span>
-      <span><i className="legend-swatch" style={{ background: HOT.hot_95 }} />Hotspot 95%</span>
-      <span><i className="legend-swatch" style={{ background: HOT.hot_90 }} />Hotspot 90%</span>
-      <span><i className="legend-swatch" style={{ background: HOT.cold_95 }} />Cold spot</span>
-      <span><i className="legend-swatch" style={{ background: HOT.not_significant }} />Not significant</span>
+    <div className="legend" aria-label={t('Legend')}>
+      <span><i className="legend-swatch" style={{ background: HOT.hot_99 }} />{t('Very strong hotspot')}</span>
+      <span><i className="legend-swatch" style={{ background: HOT.hot_95 }} />{t('Strong hotspot')}</span>
+      <span><i className="legend-swatch" style={{ background: HOT.hot_90 }} />{t('Hotspot')}</span>
+      <span><i className="legend-swatch" style={{ background: HOT.cold_95 }} />{t('Few reports')}</span>
+      <span><i className="legend-swatch" style={{ background: HOT.not_significant }} />{t('Normal')}</span>
     </div>
   )
   if (layer === 'silent') return (
-    <div className="legend"><span><i className="legend-swatch" style={{ background: '#8b5cf6', border: '2px dashed #6d28d9' }} />Silent zone: severe deficit, few reports</span><span>Circle size = population</span></div>
+    <div className="legend"><span><i className="legend-swatch" style={{ background: '#8b5cf6', border: '2px dashed #6d28d9' }} />{t('Silent area: big need, few reports')}</span><span>{t('Bigger circle = more people')}</span></div>
   )
   return (
-    <div className="legend" aria-label="Need-Gap Index legend">
-      <span>Need-Gap Index:</span>
-      {[['<38', '#fef3c7'], ['38–50', '#fcd34d'], ['50–62', '#f59e0b'], ['62–75', '#dc2626'], ['75+', '#7f1d1d']].map(([l, c]) => (
-        <span key={l}><i className="legend-swatch" style={{ background: c, border: '1px solid #cbd5e1' }} />{l}</span>
+    <div className="legend" aria-label={t('Legend')}>
+      <span>{t('Need level')}:</span>
+      {[['Low', '#fef3c7'], ['Some', '#fcd34d'], ['Medium', '#f59e0b'], ['High', '#dc2626'], ['Very high', '#7f1d1d']].map(([l, c]) => (
+        <span key={l}><i className="legend-swatch" style={{ background: c, border: '1px solid #cbd5e1' }} />{t(l)}</span>
       ))}
-      {layer === 'plans' && <span><i className="legend-swatch" style={{ border: '3px solid #0f172a' }} />Has planned investment</span>}
-      <span>Circle size = population</span>
+      {layer === 'plans' && <span><i className="legend-swatch" style={{ border: '3px solid #0f172a' }} />{t('Money already planned')}</span>}
+      <span>{t('Bigger circle = more people')}</span>
     </div>
   )
 }

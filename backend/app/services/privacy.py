@@ -1,4 +1,4 @@
-"""Privacy-by-design utilities (DPG indicators 6, 7, 9A; India DPDP, Brazil LGPD, SA POPIA, China PIPL, RU 152-FZ)."""
+"""Privacy-by-design utilities (DPG indicators 6, 7, 9A; India DPDP Act 2023 and DPDP Rules 2025)."""
 import hashlib
 import math
 import random
@@ -8,13 +8,14 @@ from app.core.config import settings
 
 _PATTERNS = [
     (re.compile(r"\b\d{4}\s?\d{4}\s?\d{4}\b"), "[ID-NUMBER]"),                      # Aadhaar
-    (re.compile(r"\b\d{3}\.?\d{3}\.?\d{3}-?\d{2}\b"), "[ID-NUMBER]"),                # Brazil CPF
-    (re.compile(r"\b\d{13}\b"), "[ID-NUMBER]"),                                       # SA ID
+    (re.compile(r"\b[A-Z]{5}\d{4}[A-Z]\b"), "[ID-NUMBER]"),                          # PAN
+    (re.compile(r"\b[A-Z]{3}\d{7}\b"), "[ID-NUMBER]"),                                # Voter ID (EPIC)
+    (re.compile(r"\b\d{2}\s?\d{2}\s?\d{2}\s?\d{5}\b"), "[ID-NUMBER]"),                 # ration card-like
     (re.compile(r"(\+?\d{1,3}[\s-]?)?\(?\d{2,5}\)?[\s-]?\d{3,5}[\s-]?\d{3,5}\b"), "[PHONE]"),
     (re.compile(r"[\w.+-]+@[\w-]+\.[\w.]+"), "[EMAIL]"),
 ]
 _NAME_INTRO = re.compile(
-    r"(my name is|i am|मेरा नाम|नाम है|నా పేరు|ମୋ ନାମ|meu nome é|me chamo|igama lami ngu|меня зовут|我叫)\s+([^\s,.;।]+(\s[^\s,.;।]+)?)",
+    r"(my name is|i am|मेरा नाम|नाम है|నా పేరు|ମୋ ନାମ|मैं हूँ|నేను|ମୁଁ)\s+([^\s,.;।]+(\s[^\s,.;।]+)?)",
     re.IGNORECASE,
 )
 

@@ -5,17 +5,21 @@ import { Building2, Info, KeyRound, LogIn, Megaphone, Phone, ShieldCheck, UserRo
 import { api } from '../api/client'
 import { useApp } from '../context/AppContext'
 import { Card, ErrorBox, PageHead } from '../components/ui'
+import { useT } from '../i18n'
 
 const WHAT = {
   field_officer: 'Checks unclear reports, closes work with proof',
   district: 'Approves projects for the district',
-  national: 'Sees the whole country, sets priorities',
-  brics_analyst: 'Compares countries',
+  state: 'Plans money and projects for the state',
+  national: 'Sees all of India, sets priorities',
 }
+const ROLE = { field_officer: 'Field officer', district: 'District collector', state: 'State planning officer', national: 'National planner', admin: 'Admin' }
+const ORDER = ['field_officer', 'district', 'state', 'national']
 
 function CitizenLogin({ next }) {
   const { sendCitizenCode, loginCitizen } = useApp()
   const nav = useNavigate()
+  const t = useT()
   const [phone, setPhone] = useState('')
   const [code, setCode] = useState('')
   const [sent, setSent] = useState(null)
@@ -38,26 +42,26 @@ function CitizenLogin({ next }) {
           {!sent ? (
             <motion.form key="phone" onSubmit={send} className="stack-md" initial={{ opacity: 0, x: -12 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 12 }}>
               <div className="field">
-                <label htmlFor="cphone">Phone number</label>
+                <label htmlFor="cphone">{t('Phone number')}</label>
                 <input id="cphone" className="input" inputMode="tel" autoComplete="tel" placeholder="+91 90000 11111" value={phone} onChange={(e) => setPhone(e.target.value)} />
-                <span className="help">Use the same number you used when reporting.</span>
+                <span className="help">{t('Use the same number you used when reporting.')}</span>
               </div>
-              <button className="btn btn-primary btn-lg" disabled={busy || phone.replace(/\D/g, '').length < 8}><Phone size={18} aria-hidden="true" />{busy ? 'Sending…' : 'Send me a code'}</button>
+              <button className="btn btn-primary btn-lg" disabled={busy || phone.replace(/\D/g, '').length < 8}><Phone size={18} aria-hidden="true" />{t(busy ? 'Sending…' : 'Send me a code')}</button>
             </motion.form>
           ) : (
             <motion.form key="code" onSubmit={verify} className="stack-md" initial={{ opacity: 0, x: -12 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 12 }}>
               <div className="field">
-                <label htmlFor="ccode">6-digit code sent to {phone}</label>
+                <label htmlFor="ccode">{t('6-digit code sent to {phone}', { phone })}</label>
                 <input id="ccode" className="input mono otp-input" inputMode="numeric" autoComplete="one-time-code" maxLength={6} value={code} onChange={(e) => setCode(e.target.value.replace(/\D/g, ''))} autoFocus />
               </div>
               {sent.demo_code && (
                 <div className="alert alert-info"><KeyRound size={18} aria-hidden="true" />
-                  <div className="small">Demo mode (no SMS gateway): your code is <strong className="mono">{sent.demo_code}</strong>
-                    <button type="button" className="btn btn-sm" style={{ marginLeft: 8 }} onClick={() => setCode(sent.demo_code)}>Fill it</button></div></div>
+                  <div className="small">{t('Demo mode (no SMS): your code is')} <strong className="mono">{sent.demo_code}</strong>
+                    <button type="button" className="btn btn-sm" style={{ marginLeft: 8 }} onClick={() => setCode(sent.demo_code)}>{t('Fill it')}</button></div></div>
               )}
               <div className="row">
-                <button className="btn btn-primary btn-lg" disabled={busy || code.length !== 6}><LogIn size={18} aria-hidden="true" />{busy ? 'Checking…' : 'Log in'}</button>
-                <button type="button" className="btn" onClick={() => { setSent(null); setCode('') }}>Change number</button>
+                <button className="btn btn-primary btn-lg" disabled={busy || code.length !== 6}><LogIn size={18} aria-hidden="true" />{t(busy ? 'Checking…' : 'Log in')}</button>
+                <button type="button" className="btn" onClick={() => { setSent(null); setCode('') }}>{t('Change number')}</button>
               </div>
             </motion.form>
           )}
@@ -66,13 +70,13 @@ function CitizenLogin({ next }) {
       </Card>
       <Card title="Why log in? (optional)">
         <ul className="check-list">
-          <li><UserRound size={18} aria-hidden="true" /><span>See <strong>all your requests</strong> in one place</span></li>
-          <li><Phone size={18} aria-hidden="true" /><span>Your number is <strong>filled in</strong> automatically</span></li>
-          <li><ShieldCheck size={18} aria-hidden="true" /><span>Your "fixed / not fixed" answer is <strong>verified</strong></span></li>
+          <li><UserRound size={18} aria-hidden="true" /><span>{t('See all your requests in one place')}</span></li>
+          <li><Phone size={18} aria-hidden="true" /><span>{t('Your number is filled in for you')}</span></li>
+          <li><ShieldCheck size={18} aria-hidden="true" /><span>{t('Your "fixed / not fixed" answer is trusted more')}</span></li>
         </ul>
         <div className="alert alert-success mt"><Info size={18} aria-hidden="true" />
-          <div className="small"><strong>You never need to log in to report.</strong> Anyone can report, even anonymously or on a shared phone.
-            <div style={{ marginTop: 8 }}><Link to="/report" className="btn btn-sm"><Megaphone size={16} aria-hidden="true" />Report without login</Link></div></div>
+          <div className="small"><strong>{t('You never need to log in to report.')}</strong> {t('Anyone can report, even without a name or on a shared phone.')}
+            <div style={{ marginTop: 8 }}><Link to="/report" className="btn btn-sm"><Megaphone size={16} aria-hidden="true" />{t('Report without login')}</Link></div></div>
         </div>
       </Card>
     </div>
@@ -81,6 +85,7 @@ function CitizenLogin({ next }) {
 
 function OfficialLogin() {
   const { login } = useApp()
+  const t = useT()
   const [u, setU] = useState('')
   const [p, setP] = useState('')
   const [err, setErr] = useState(null)
@@ -96,19 +101,20 @@ function OfficialLogin() {
     <div className="grid g-2" style={{ alignItems: 'start' }}>
       <Card title="Official login" sub="For government staff only">
         <form onSubmit={submit} className="stack-md">
-          <div className="field"><label htmlFor="u">Username</label><input id="u" className="input" autoComplete="username" value={u} onChange={(e) => setU(e.target.value)} /></div>
-          <div className="field"><label htmlFor="p">Password</label><input id="p" type="password" className="input" autoComplete="current-password" value={p} onChange={(e) => setP(e.target.value)} /></div>
+          <div className="field"><label htmlFor="u">{t('Username')}</label><input id="u" className="input" autoComplete="username" value={u} onChange={(e) => setU(e.target.value)} /></div>
+          <div className="field"><label htmlFor="p">{t('Password')}</label><input id="p" type="password" className="input" autoComplete="current-password" value={p} onChange={(e) => setP(e.target.value)} /></div>
           <ErrorBox error={err} />
-          <button className="btn btn-primary btn-lg" disabled={busy || !u || !p}><LogIn size={18} aria-hidden="true" />{busy ? 'Signing in…' : 'Log in'}</button>
+          <button className="btn btn-primary btn-lg" disabled={busy || !u || !p}><LogIn size={18} aria-hidden="true" />{t(busy ? 'Signing in…' : 'Log in')}</button>
         </form>
-        <p className="help mt">In a real deployment this connects to the government's single sign-on (e.g. Parichay, gov.br).</p>
+        <p className="help mt">{t('In real use this connects to government sign-on (Parichay).')}</p>
       </Card>
       <Card title="Demo accounts" sub="Tap one to log in instantly">
         <div className="stack">
-          {demo.map((d) => (
+          {[...demo].sort((a, b) => ORDER.indexOf(a.role) - ORDER.indexOf(b.role)).map((d) => (
             <motion.button key={d.username} whileHover={{ y: -2 }} whileTap={{ scale: 0.98 }} className="card role-card" style={{ textAlign: 'left', boxShadow: 'none', cursor: 'pointer' }} onClick={(e) => submit(e, d.username, d.password)}>
-              <div className="row-between"><strong>{d.name}</strong><span className="badge badge-blue">{d.title}</span></div>
-              <div className="small muted">{WHAT[d.role]}</div>
+              <div className="row-between"><strong>{d.name}</strong><span className="badge badge-blue">{t(ROLE[d.role] || d.role)}</span></div>
+              <div className="small">{t(WHAT[d.role] || '')}</div>
+              <div className="xs muted">{d.title}</div>
               <div className="xs mono muted">{d.username} / {d.password}</div>
             </motion.button>
           ))}
@@ -121,6 +127,7 @@ function OfficialLogin() {
 export default function Login() {
   const { isOfficial, isCitizen } = useApp()
   const nav = useNavigate()
+  const t = useT()
   const [sp, setSp] = useSearchParams()
   const as = sp.get('as') === 'official' ? 'official' : sp.get('as') === 'citizen' ? 'citizen' : 'citizen'
   const next = sp.get('next')
@@ -132,12 +139,12 @@ export default function Login() {
       <PageHead title={as === 'official' ? 'Official login' : 'Citizen login'} eyebrow={as === 'official' ? 'For government staff' : 'Optional for citizens'}>
         {as === 'official' ? 'Log in to see the inbox, dashboard, priorities and projects.' : 'You never need to log in to report. Log in only to see all your requests in one place.'}
       </PageHead>
-      <div className="login-switch" role="tablist" aria-label="Who are you?">
+      <div className="login-switch" role="tablist" aria-label={t('Who are you?')}>
         {[{ v: 'citizen', label: 'I am a citizen', Icon: UserRound }, { v: 'official', label: 'I am an official', Icon: Building2 }].map(({ v, label, Icon }) => (
           <button key={v} role="tab" aria-selected={as === v} className={`login-tab ${as === v ? 'active' : ''}`}
             onClick={() => setSp(next ? { as: v, next } : { as: v })}>
             {as === v && <motion.span layoutId="login-pill" className="login-pill" transition={{ type: 'spring', stiffness: 400, damping: 32 }} />}
-            <span className="login-tab-label"><Icon size={18} aria-hidden="true" />{label}</span>
+            <span className="login-tab-label"><Icon size={18} aria-hidden="true" />{t(label)}</span>
           </button>
         ))}
       </div>

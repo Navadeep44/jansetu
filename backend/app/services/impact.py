@@ -48,7 +48,8 @@ def project_impacts(db: Session, country: str | None = None) -> list[dict]:
         years = sorted(hist)
         out.append({
             "project_id": p.id, "code": p.code, "title": p.title, "area": p.area.name if p.area else "",
-            "country": p.country_code, "sector": p.sector, "cost_usd": p.cost_usd, "beneficiaries": p.beneficiaries,
+            "country": p.country_code, "state": p.area.state if p.area else "", "district": p.area.district if p.area else "",
+            "sector": p.sector, "cost_usd": p.cost_usd, "cost_local": p.cost_local, "beneficiaries": p.beneficiaries,
             "completed_at": p.completed_at.isoformat(), "source": p.source,
             "complaints_per_1000hh_month": {"treated_before": round(tb, 2), "treated_after": round(ta, 2),
                                             "control_before": round(cb, 2), "control_after": round(ca, 2)},

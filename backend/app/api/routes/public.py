@@ -12,9 +12,10 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.core import security
+from app.core.config import settings
 from app.core.database import get_db
 from app.core.i18n import t
-from app.models import CitizenRequest, DemandCluster, Project
+from app.models import Area, CitizenRequest, DemandCluster, Project
 from app.schemas.serializers import cluster_out, project_out, request_out
 from app.services import analytics_cache, clustering, pipeline, privacy, scoring
 from app.services.ai.lexicon import sector_sdg
@@ -126,13 +127,13 @@ def support(cluster_id: int, body: SupportIn, db: Session = Depends(get_db)):
 
 
 @router.get("/public/board")
-def board(country: str | None = None, db: Session = Depends(get_db)):
+def board(state: str | None = None, country: str | None = None, db: Session = Depends(get_db)):
     """Transparency: what citizens asked for and what government did about it."""
     q = db.query(CitizenRequest)
     pq = db.query(Project).filter(Project.status.in_(["approved", "in_progress", "completed"]))
-    if country:
-        q = q.filter(CitizenRequest.country_code == country)
-        pq = pq.filter(Project.country_code == country)
+    if state:
+        q = q.join(Area, CitizenRequest.area_id == Area.id).filter(Area.state == state)
+        pq = pq.join(Area, Project.area_id == Area.id).filter(Area.state == state)
     projects = pq.order_by(Project.status.desc(), Project.completed_at.desc()).all()
     items = []
     for p in projects:
@@ -157,16 +158,22 @@ def board(country: str | None = None, db: Session = Depends(get_db)):
 
 
 @router.get("/export/need-gap.csv")
-def export_need_gap(country: str | None = None, db: Session = Depends(get_db)):
+def export_need_gap(state: str | None = None, country: str | None = None, db: Session = Depends(get_db)):
     """Open data export (DPG indicator 6): aggregated, contains no personal data."""
-    rows = [r for r in scoring.need_gap(db) if not country or r["country"] == country]
-    cols = ["country", "state", "district", "area", "sector", "ngi", "effective_households", "reports", "demand_rate",
+    rows = [r for r in scoring.need_gap(db) if not state or r["state"] == state]
+    cols = ["state", "district", "area", "sector", "ngi", "effective_households", "reports", "demand_rate",
             "deficit", "vulnerability", "connectivity", "silent_zone", "covered", "planned_budget_local"]
     buf = io.StringIO()
     w = csv.DictWriter(buf, fieldnames=cols, extrasaction="ignore")
     w.writeheader()
     for r in rows:
-        w.writerow({k: r.get(k) for k in cols})
+        row = {k: r.get(k) for k in cols}
+        # k-anonymity: never publish a count that could point to fewer than k households
+        if (r.get("effective_households") or 0) < settings.k_anonymity:
+            row["effective_households"] = f"<{settings.k_anonymity}"
+            row["reports"] = f"<{settings.k_anonymity}"
+            row["demand_rate"] = ""
+        w.writerow(row)
     buf.seek(0)
     return StreamingResponse(iter([buf.getvalue()]), media_type="text/csv",
                              headers={"Content-Disposition": "attachment; filename=jansetu-need-gap.csv"})

@@ -1,4 +1,4 @@
-"""JanSetu API - Citizen Demand Intelligence as a Digital Public Good (BRICS Track 1)."""
+"""JanSetu API - Citizen Demand Intelligence as a Digital Public Good for India (Track 1: AI for Digital Public Infrastructure & Governance)."""
 import logging
 from contextlib import asynccontextmanager
 from pathlib import Path

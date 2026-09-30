@@ -30,6 +30,8 @@ async function request(path, { method = 'GET', body, form, headers = {} } = {}) 
 }
 
 const qs = (params = {}) => {
+  // India-only: any legacy `country` filter is really the selected state
+  if (params && params.country !== undefined && params.state === undefined) { params = { ...params, state: params.country }; delete params.country }
   const p = Object.entries(params).filter(([, v]) => v !== undefined && v !== null && v !== '' && v !== 'all')
   return p.length ? '?' + new URLSearchParams(p).toString() : ''
 }
@@ -43,10 +45,10 @@ export const api = {
   myRequests: (phone) => request('/api/citizen/requests' + qs({ phone })),
   nearby: (params) => request('/api/nearby' + qs(params)),
   support: (clusterId, phone, language) => request(`/api/clusters/${clusterId}/support`, { method: 'POST', body: { phone: phone || null, language } }),
-  board: (country) => request('/api/public/board' + qs({ country })),
-  exportUrl: (country) => `${BASE}/api/export/need-gap.csv${qs({ country })}`,
+  board: (state) => request('/api/public/board' + qs({ state })),
+  exportUrl: (state) => `${BASE}/api/export/need-gap.csv${qs({ state })}`,
   meta: () => request('/api/meta'),
-  areas: (country) => request('/api/areas' + qs({ country })),
+  areas: (state) => request('/api/areas' + qs({ state })),
   preview: (text, language) => request('/api/intake/preview', { method: 'POST', body: { text, language } }),
   intakeForm: (form) => request('/api/intake/form', { method: 'POST', form }),
   intakeText: (body) => request('/api/intake/text', { method: 'POST', body }),
@@ -62,24 +64,26 @@ export const api = {
   closeAudit: (id, closure_note) => request(`/api/requests/${id}/close/audit`, { method: 'POST', body: { closure_note } }),
   close: (id, closure_note, force = false) => request(`/api/requests/${id}/close`, { method: 'POST', body: { closure_note, force } }),
   auditLog: () => request('/api/audit-log'),
-  overview: (country) => request('/api/analytics/overview' + qs({ country })),
+  overview: (state) => request('/api/analytics/overview' + qs({ state })),
+  states: () => request('/api/analytics/states'),
   needGap: (params) => request('/api/analytics/need-gap' + qs(params)),
   mapAreas: (params) => request('/api/analytics/areas' + qs(params)),
-  silent: (country) => request('/api/analytics/silent-zones' + qs({ country })),
-  alignment: (country) => request('/api/analytics/alignment' + qs({ country })),
+  silent: (state) => request('/api/analytics/silent-zones' + qs({ state })),
+  alignment: (state, national) => request('/api/analytics/alignment' + qs({ state, national })),
   trends: (params) => request('/api/analytics/trends' + qs(params)),
-  alerts: (country) => request('/api/analytics/alerts' + qs({ country })),
-  sectors: (country) => request('/api/analytics/sectors' + qs({ country })),
+  alerts: (state) => request('/api/analytics/alerts' + qs({ state })),
+  sectors: (state) => request('/api/analytics/sectors' + qs({ state })),
   clusters: (params) => request('/api/clusters' + qs(params)),
   cluster: (id) => request(`/api/clusters/${id}`),
   projects: (params) => request('/api/projects' + qs(params)),
   project: (id) => request(`/api/projects/${id}`),
   decide: (id, decision, reason) => request(`/api/projects/${id}/decision`, { method: 'POST', body: { decision, reason } }),
   regenerate: () => request('/api/projects/regenerate', { method: 'POST' }),
-  optimise: (country, budget) => request('/api/projects/optimise', { method: 'POST', body: { country, budget } }),
+  optimise: (state, budget) => request('/api/projects/optimise', { method: 'POST', body: { state: state || null, budget } }),
   ask: (question) => request('/api/query', { method: 'POST', body: { question } }),
   brief: (params) => request('/api/briefs' + qs(params)),
-  impactProjects: (country) => request('/api/impact/projects' + qs({ country })),
-  kpis: (country) => request('/api/impact/kpis' + qs({ country })),
-  brics: () => request('/api/brics/exchange'),
+  impactProjects: (state) => request('/api/impact/projects' + qs({ state })),
+  kpis: () => request('/api/impact/kpis'),
+  gramSabha: (district, area) => request('/api/plans/gram-sabha' + qs({ district, area })),
+  gramSabhaCsv: (district, area) => `${BASE}/api/plans/gram-sabha.csv${qs({ district, area })}`,
 }

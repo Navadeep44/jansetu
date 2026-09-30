@@ -20,7 +20,7 @@ ALERT_TEXT = {
 }
 
 
-def weekly_series(db: Session, weeks: int = 12, country: str | None = None, sector: str | None = None) -> list[dict]:
+def weekly_series(db: Session, weeks: int = 12, country: str | None = None, sector: str | None = None, state: str | None = None) -> list[dict]:
     now = datetime.utcnow()
     since = now - timedelta(weeks=weeks)
     q = db.query(CitizenRequest).filter(CitizenRequest.created_at >= since)
@@ -28,6 +28,8 @@ def weekly_series(db: Session, weeks: int = 12, country: str | None = None, sect
         q = q.filter(CitizenRequest.country_code == country)
     if sector and sector != "all":
         q = q.filter(CitizenRequest.category == sector)
+    if state:
+        q = q.join(Area, CitizenRequest.area_id == Area.id).filter(Area.state == state)
     buckets = defaultdict(lambda: defaultdict(int))
     for r in q.all():
         wk = (now - r.created_at).days // 7
@@ -41,7 +43,7 @@ def weekly_series(db: Session, weeks: int = 12, country: str | None = None, sect
     return out
 
 
-def alerts(db: Session, country: str | None = None, z_threshold: float = 2.5, min_count: int = 5) -> list[dict]:
+def alerts(db: Session, country: str | None = None, state: str | None = None, z_threshold: float = 2.5, min_count: int = 5) -> list[dict]:
     now = datetime.utcnow()
     since = now - timedelta(weeks=7)
     q = db.query(CitizenRequest).filter(CitizenRequest.created_at >= since, CitizenRequest.area_id.isnot(None))
@@ -61,7 +63,9 @@ def alerts(db: Session, country: str | None = None, z_threshold: float = 2.5, mi
         z = (last - mu) / max(sd, 0.75)
         if last >= min_count and z >= z_threshold:
             a = areas[aid]
-            out.append({"area_id": aid, "area": a.name, "district": a.district, "country": a.country_code,
+            if state and a.state != state:
+                continue
+            out.append({"area_id": aid, "area": a.name, "district": a.district, "state": a.state, "country": a.country_code,
                         "sector": sector, "last_week": last, "baseline_weekly_mean": round(mu, 1), "z": round(z, 1),
                         "series": series, "lat": a.lat, "lng": a.lng,
                         "severity": "critical" if z >= 4 else "high",

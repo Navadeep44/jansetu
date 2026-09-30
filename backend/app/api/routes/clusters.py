@@ -5,19 +5,23 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
-from app.models import CitizenRequest, DemandCluster, Project
+from app.models import Area, CitizenRequest, DemandCluster, Project
 from app.schemas.serializers import area_out, cluster_out, project_out, request_out
 
 router = APIRouter(prefix="/clusters", tags=["demand clusters"])
 
 
 @router.get("")
-def list_clusters(country: str | None = None, category: str | None = None, area_id: int | None = None,
+def list_clusters(country: str | None = None, state: str | None = None, district: str | None = None, category: str | None = None, area_id: int | None = None,
                   status: str | None = None, sort: str = "households", limit: int = 50, offset: int = 0,
                   db: Session = Depends(get_db)):
     q = db.query(DemandCluster)
-    if country:
-        q = q.filter(DemandCluster.country_code == country)
+    if state or district:
+        q = q.join(Area, DemandCluster.area_id == Area.id)
+        if state:
+            q = q.filter(Area.state == state)
+        if district:
+            q = q.filter(Area.district == district)
     if category:
         q = q.filter(DemandCluster.category == category)
     if area_id:

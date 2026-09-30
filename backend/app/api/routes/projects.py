@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session
 from app.core.database import get_db
 from app.core.i18n import t
 from app.core.security import PLANNER_ROLES, require
-from app.models import AuditLog, CitizenRequest, DemandCluster, Project
+from app.models import Area, AuditLog, CitizenRequest, DemandCluster, Project
 from app.schemas.inputs import DecisionIn, OptimiseIn
 from app.schemas.serializers import project_out
 from app.services import analytics_cache, pipeline, recommender
@@ -18,18 +18,18 @@ TRANSITIONS = {"approve": "approved", "defer": "deferred", "reject": "rejected",
 
 
 @router.get("")
-def list_projects(source: str | None = None, country: str | None = None, status: str | None = None, sector: str | None = None,
+def list_projects(source: str | None = None, country: str | None = None, state: str | None = None, status: str | None = None, sector: str | None = None,
                   limit: int = 100, db: Session = Depends(get_db)):
     q = db.query(Project)
     if source:
         q = q.filter(Project.source == source)
-    if country:
-        q = q.filter(Project.country_code == country)
+    if state:
+        q = q.join(Area, Project.area_id == Area.id).filter(Area.state == state)
     if status:
         q = q.filter(Project.status.in_(status.split(",")))
     if sector:
         q = q.filter(Project.sector == sector)
-    return [project_out(p) for p in q.order_by(Project.score.desc(), Project.cost_usd.desc()).limit(limit).all()]
+    return [project_out(p) for p in q.order_by(Project.score.desc(), Project.cost_local.desc()).limit(limit).all()]
 
 
 @router.get("/{project_id}")
@@ -97,8 +97,10 @@ def decide(project_id: int, body: DecisionIn, role: str = Depends(require(*PLANN
 @router.post("/optimise")
 def optimise(body: OptimiseIn, db: Session = Depends(get_db)):
     statuses = ["recommended", "approved"] if body.include_approved else ["recommended"]
-    cands = db.query(Project).filter(Project.source == "recommended", Project.country_code == body.country,
-                                     Project.status.in_(statuses)).all()
+    q = db.query(Project).filter(Project.source == "recommended", Project.status.in_(statuses))
+    if body.state:
+        q = q.join(Area, Project.area_id == Area.id).filter(Area.state == body.state)
+    cands = q.all()
     res = recommender.optimise(cands, body.budget)
     res["projects"] = [project_out(p) for p in cands if p.id in set(res["selected"])]
     res["candidates"] = len(cands)

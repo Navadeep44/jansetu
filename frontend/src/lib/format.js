@@ -12,14 +12,16 @@ export const SECTORS = {
 // Fixed categorical order (validated with the dataviz palette validator: CVD + normal-vision separation pass)
 export const SECTOR_KEYS = ['water', 'roads', 'sanitation', 'electricity', 'health', 'education']
 
-export const COUNTRIES = { IN: 'India', BR: 'Brazil', ZA: 'South Africa', RU: 'Russia', CN: 'China', EG: 'Egypt', ET: 'Ethiopia', IR: 'Iran', AE: 'UAE', ID: 'Indonesia' }
-export const CURRENCY = { IN: 'INR', BR: 'BRL', ZA: 'ZAR' }
+// India-only deployment: five pilot states across Telugu, Hindi, Odia and Bhojpuri regions
+export const STATES = ['Telangana', 'Odisha', 'Delhi', 'Bihar', 'Uttar Pradesh']
+export const DISTRICTS = { Telangana: ['Adilabad', 'Hyderabad'], Odisha: ['Koraput'], Delhi: ['North East Delhi', 'North West Delhi', 'South Delhi', 'East Delhi', 'South West Delhi'], Bihar: ['Gaya'], 'Uttar Pradesh': ['Bahraich'] }
+export const COUNTRIES = { IN: 'India' } // kept for older imports
 
 export const LANG_NAMES = {
-  en: 'English', hi: 'Hindi', bho: 'Bhojpuri', te: 'Telugu', or: 'Odia', ta: 'Tamil', bn: 'Bengali', pt: 'Portuguese',
-  zu: 'isiZulu', xh: 'isiXhosa', af: 'Afrikaans', ru: 'Russian', zh: 'Chinese', ar: 'Arabic', am: 'Amharic', fa: 'Persian', id: 'Indonesian', gon: 'Gondi',
+  en: 'English', hi: 'Hindi', bho: 'Bhojpuri', te: 'Telugu', or: 'Odia', ta: 'Tamil', bn: 'Bengali', mr: 'Marathi',
+  ur: 'Urdu', kn: 'Kannada', ml: 'Malayalam', gu: 'Gujarati', pa: 'Punjabi', gon: 'Gondi',
 }
-export const SPEECH_TAGS = { en: 'en-IN', hi: 'hi-IN', bho: 'hi-IN', te: 'te-IN', or: 'or-IN', ta: 'ta-IN', bn: 'bn-IN', pt: 'pt-BR', zu: 'zu-ZA', xh: 'xh-ZA', af: 'af-ZA', ru: 'ru-RU', zh: 'zh-CN', ar: 'ar-EG' }
+export const SPEECH_TAGS = { en: 'en-IN', hi: 'hi-IN', bho: 'hi-IN', te: 'te-IN', or: 'or-IN', ta: 'ta-IN', bn: 'bn-IN', mr: 'mr-IN', ur: 'ur-IN', kn: 'kn-IN', ml: 'ml-IN', gu: 'gu-IN', pa: 'pa-IN', gon: 'te-IN' }
 
 const nf = new Intl.NumberFormat('en-IN')
 export const fmt = (n, d = 0) => (n === null || n === undefined || Number.isNaN(n) ? '–' : Number(n).toLocaleString('en-IN', { maximumFractionDigits: d, minimumFractionDigits: 0 }))
@@ -32,28 +34,23 @@ export const compact = (n) => {
   if (a >= 1e3) return (n / 1e3).toFixed(1) + 'k'
   return nf.format(Math.round(n))
 }
-export const money = (amount, country) => {
+// Indian rupees in lakh / crore (the second argument is ignored; kept for older calls)
+export const money = (amount) => {
   if (amount === null || amount === undefined) return '–'
-  if (country === 'IN') {
-    if (amount >= 1e7) return `₹${(amount / 1e7).toFixed(1)} Cr`
-    if (amount >= 1e5) return `₹${(amount / 1e5).toFixed(1)} L`
-    return `₹${nf.format(amount)}`
-  }
-  const sym = { BR: 'R$', ZA: 'R', USD: '$' }[country] || '$'
-  if (amount >= 1e9) return `${sym}${(amount / 1e9).toFixed(1)}B`
-  if (amount >= 1e6) return `${sym}${(amount / 1e6).toFixed(1)}M`
-  if (amount >= 1e3) return `${sym}${(amount / 1e3).toFixed(0)}k`
-  return `${sym}${nf.format(amount)}`
+  if (amount >= 1e7) return `₹${(amount / 1e7).toFixed(1)} Cr`
+  if (amount >= 1e5) return `₹${(amount / 1e5).toFixed(1)} L`
+  return `₹${nf.format(Math.round(amount))}`
 }
-export const usd = (n) => money(n, 'USD')
+export const inr = money
 export const date = (iso) => (iso ? new Date(iso.endsWith('Z') ? iso : iso + 'Z').toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : '–')
-export const ago = (iso) => {
+// Pass the t() function from useT() to get the text in the user's language.
+export const ago = (iso, t = (s, v) => s.replace(/\{(\w+)\}/g, (_, k) => v[k])) => {
   if (!iso) return ''
   const d = (Date.now() - new Date(iso.endsWith('Z') ? iso : iso + 'Z').getTime()) / 86400000
-  if (d < 1) return 'today'
-  if (d < 2) return 'yesterday'
-  if (d < 45) return `${Math.floor(d)} days ago`
-  return `${Math.floor(d / 30)} months ago`
+  if (d < 1) return t('today', {})
+  if (d < 2) return t('yesterday', {})
+  if (d < 45) return t('{n} days ago', { n: Math.floor(d) })
+  return t('{n} months ago', { n: Math.floor(d / 30) })
 }
 export const ngiColor = (v) => (v >= 75 ? '#7f1d1d' : v >= 62 ? '#dc2626' : v >= 50 ? '#f59e0b' : v >= 38 ? '#fcd34d' : '#fef3c7')
 export const STATUS_LABEL = {
@@ -67,3 +64,4 @@ export const STATUS_TONE = {
   resolved_pending_verification: 'amber', rejected: 'red', deferred: 'amber', recommended: 'amber', sanctioned: 'blue', planned: '', clustered: 'blue', resolved: 'green',
 }
 export const CHANNEL_LABEL = { whatsapp: 'WhatsApp', telegram: 'Telegram', ivr: 'IVR voice call', sms: 'SMS', web: 'Web / app', assisted: 'Assisted (CSC/ASHA)', community: 'Community meeting', import: 'Portal import', simulator: 'Simulator' }
+export const usd = money // legacy alias: pass cost_local (INR)

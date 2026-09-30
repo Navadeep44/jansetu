@@ -20,7 +20,6 @@ const Projects = lazy(() => import('./pages/gov/Projects'))
 const Ask = lazy(() => import('./pages/gov/Ask'))
 const Brief = lazy(() => import('./pages/gov/Brief'))
 const Impact = lazy(() => import('./pages/gov/Impact'))
-const Brics = lazy(() => import('./pages/brics/Brics'))
 const Trust = lazy(() => import('./pages/trust/Trust'))
 const Audit = lazy(() => import('./pages/trust/Trust').then((m) => ({ default: m.Audit })))
 
@@ -46,7 +45,6 @@ export default function App() {
           <Route path="ask" element={<RequireOfficial><Ask /></RequireOfficial>} />
           <Route path="brief" element={<RequireOfficial><Brief /></RequireOfficial>} />
           <Route path="impact" element={<RequireOfficial><Impact /></RequireOfficial>} />
-          <Route path="brics" element={<Brics />} />
           <Route path="trust" element={<Trust />} />
           <Route path="audit" element={<RequireOfficial><Audit /></RequireOfficial>} />
           <Route path="*" element={<div className="empty">Page not found.</div>} />

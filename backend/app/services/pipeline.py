@@ -15,9 +15,7 @@ from app.services import analytics_cache, clustering, privacy
 from app.services.ai.extraction import extract
 from app.services.geo import gazetteer
 
-LANG_COUNTRY = {"pt": "BR", "zu": "ZA", "xh": "ZA", "af": "ZA", "te": "IN", "hi": "IN", "bho": "IN", "or": "IN",
-                "ta": "IN", "bn": "IN", "mr": "IN", "gon": "IN", "ru": "RU", "zh": "CN", "ar": "EG", "am": "ET",
-                "fa": "IR", "id": "ID"}
+LANG_COUNTRY = {}  # India-only deployment
 _ALPH = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
 
 
@@ -53,7 +51,7 @@ def process(db: Session, *, text: str, channel: str = "web", lang_hint: str | No
         a, conf, _ = gazetteer.resolve_text(db, f"{location_text} {text}", country_hint, x.get("location_mentions"))
         if a and conf >= 0.75:
             area, geo_conf, geo_method = a, conf, "place_name"
-    country = (area.country_code if area else None) or country_hint or LANG_COUNTRY.get(x["language"], "IN")
+    country = "IN"
 
     flags = list(x["flags"])
     if not area:

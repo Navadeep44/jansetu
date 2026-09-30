@@ -44,35 +44,13 @@ T = [
     ("or", "education", "ସ୍କୁଲରେ ଶିକ୍ଷକ ନାହାନ୍ତି, ପିଲାମାନେ ପଢ଼ିପାରୁନାହାନ୍ତି।", "There are no teachers in the school; the children cannot study."),
     ("or", "electricity", "ଆମ ଗାଁରେ ବିଜୁଳି ନାହିଁ।", "There is no electricity in our village."),
     ("or", "sanitation", "ଗାଁରେ ଶୌଚାଳୟ ନାହିଁ, ନାଳ ଉଛୁଳି ପଡ଼ୁଛି।", "No toilets in the village and the drain is overflowing."),
-    # ---------------- Portuguese ----------------
-    ("pt", "water", "Estamos sem água há cinco dias no bairro, as crianças não têm água para beber.", "We have had no water for five days; the children have nothing to drink."),
-    ("pt", "water", "A água chega suja e com cheiro, muita gente com doença de barriga.", "The water arrives dirty and smelly; many people have stomach illness."),
-    ("pt", "roads", "A rua está cheia de buracos e alaga toda vez que chove.", "The street is full of potholes and floods whenever it rains."),
-    ("pt", "roads", "Não tem asfalto na nossa rua, a ambulância não consegue subir o morro.", "Our street has no asphalt; the ambulance cannot climb the hill."),
-    ("pt", "electricity", "Poste de luz queimado há dois meses, a rua fica escura e perigosa.", "The street light has been out for two months; the street is dark and dangerous."),
-    ("pt", "electricity", "Falta de energia quase todo dia no bairro.", "Power cuts almost every day in the neighbourhood."),
-    ("pt", "health", "O posto de saúde não tem médico e a fila começa às 4 da manhã.", "The health post has no doctor and the queue starts at 4 am."),
-    ("pt", "health", "Não tem remédio na UBS há semanas.", "There has been no medicine at the health unit for weeks."),
-    ("pt", "education", "Falta vaga na creche, as mães não conseguem trabalhar.", "There are no creche places; mothers cannot work."),
-    ("pt", "education", "A escola está sem professor de matemática há meses.", "The school has had no maths teacher for months."),
-    ("pt", "sanitation", "Esgoto a céu aberto na frente das casas, cheiro forte e ratos.", "Open sewage in front of the houses; strong smell and rats."),
-    ("pt", "sanitation", "O lixo não é recolhido há duas semanas.", "Garbage has not been collected for two weeks."),
-    # ---------------- isiZulu ----------------
-    ("zu", "water", "Asinawo amanzi izinsuku ezintathu, izingane azinawo amanzi okuphuza.", "We have had no water for three days; the children have no drinking water."),
-    ("zu", "water", "Ompompi bomphakathi bayaphuka njalo, sicela nisilungisele.", "The community taps keep breaking; please fix them for us."),
-    ("zu", "electricity", "Awukho ugesi kusukela izolo, i-load shedding ayipheli.", "No electricity since yesterday; load shedding never ends."),
-    ("zu", "electricity", "Ugesi uyacima njalo ebusuku, kuyingozi ezitaladini.", "The power goes off every night; the streets are dangerous."),
-    ("zu", "roads", "Umgwaqo unemigodi eminingi, ama-ambulensi awakwazi ukungena.", "The road has many potholes; ambulances cannot get in."),
-    ("zu", "health", "Umtholampilo awunawo amakhambi, silinda amahora amaningi.", "The clinic has no medicines; we wait for many hours."),
-    ("zu", "education", "Isikole sigcwele kakhulu, abafundi abangu-80 ekilasini elilodwa.", "The school is overcrowded: 80 learners in one classroom."),
-    ("zu", "sanitation", "Amathoyilethi agcwele futhi indle igeleza ezitaladini.", "The toilets are full and sewage flows in the streets."),
-    # ---------------- English ----------------
-    ("en", "water", "There has been no water in our section for four days. We are buying water from tankers.", ""),
-    ("en", "roads", "The gravel road to our area washes away every rainy season and ambulances cannot reach us.", ""),
-    ("en", "electricity", "Load shedding and a broken transformer mean power cuts every evening.", ""),
-    ("en", "health", "The clinic closes at 4pm and there is only one nurse for the whole township.", ""),
-    ("en", "education", "Our school has no proper classrooms; children learn in mud structures.", ""),
-    ("en", "sanitation", "The sewer has been overflowing on our street for weeks and kids play near it.", ""),
+    # ---------------- English (Indian usage) ----------------
+    ("en", "water", "No water in our basti for four days. We are buying tanker water at 300 rupees.", ""),
+    ("en", "roads", "The kachha road to our village washes away every monsoon and the 108 ambulance cannot reach us.", ""),
+    ("en", "electricity", "Power cuts every evening and the transformer keeps tripping; children cannot study.", ""),
+    ("en", "health", "The PHC closes at 2 pm and there is only one ANM for five villages.", ""),
+    ("en", "education", "Our government school has one teacher for 120 children and no toilet for girls.", ""),
+    ("en", "sanitation", "The nala has been overflowing on our lane for weeks and children play near it.", ""),
 ]
 
 # Low-severity "convenience" complaints typical of affluent, highly connected areas
@@ -81,17 +59,16 @@ AFFLUENT = [
     ("en", "electricity", "Street light outside our gate not working, please replace the bulb.", ""),
     ("en", "roads", "Footpath tiles are uneven near the market, please repair.", ""),
     ("hi", "electricity", "पार्क की स्ट्रीट लाइट बंद है, कृपया ठीक करें।", "The park street light is off, please fix it."),
-    ("pt", "roads", "Buraco enorme na avenida, já estourou o pneu do meu carro.", "Huge pothole on the avenue; it already burst my car tyre."),
-    ("pt", "electricity", "Poste apagado na rua, precisa trocar a lâmpada.", "Street light out on the street; the bulb needs replacing."),
-    ("pt", "roads", "Asfalto irregular na rua, precisa de recapeamento.", "Uneven asphalt on the street; needs resurfacing."),
+    ("te", "roads", "మా కాలనీ రోడ్డు మీద చిన్న గుంత ఉంది, రీ-సర్ఫేసింగ్ చేయండి.", "There is a small pothole on our colony road; please resurface it."),
+    ("te", "electricity", "పార్క్ దగ్గర వీధి దీపం వెలగడం లేదు.", "The street light near the park is not working."),
 ]
 
-CAMPAIGN = ("pt", "roads", "Exigimos recapeamento imediato da nossa rua, buracos em toda a via!", "We demand immediate resurfacing of our street; potholes everywhere!")
+CAMPAIGN = ("en", "roads", "We demand immediate resurfacing of our road, potholes everywhere! Forward to all residents.", "")
 
 COMMUNITY = [
     ("Narnoor", "te", "గ్రామసభ తీర్మానం: మా గ్రామానికి రోడ్డు కావాలి, వర్షాకాలంలో అంబులెన్స్ రాదు (143 మంది)", "Gram Sabha resolution: our village needs a road; the ambulance cannot come in the monsoon (143 people)", 143),
     ("Jainoor", "te", "గ్రామసభ: తాగునీరు లేదు, బోరు పాడైపోయింది (88 మంది)", "Gram Sabha: no drinking water, the borewell is broken (88 people)", 88),
     ("Boipariguda", "or", "ଗ୍ରାମସଭା: ଆମ ଗାଁକୁ ରାସ୍ତା ନାହିଁ (120 ଜଣ)", "Gram Sabha: there is no road to our village (120 people)", 120),
-    ("Grajaú", "pt", "Assembleia do bairro: esgoto a céu aberto é a prioridade número um (210 pessoas)", "Neighbourhood assembly: open sewage is priority number one (210 people)", 210),
-    ("Diepsloot", "zu", "Umhlangano womphakathi: asinawo amanzi, sidinga ompompi abengeziwe (175 abantu)", "Community meeting: we have no water, we need more taps (175 people)", 175),
+    ("Imamganj", "hi", "ग्राम सभा प्रस्ताव: गाँव में पीने का पानी नहीं है, नया हैंडपंप चाहिए (160 लोग)", "Gram Sabha resolution: no drinking water in the village, we need a new handpump (160 people)", 160),
+    ("Mihinpurwa", "hi", "ग्राम सभा: गाँव तक पक्की सड़क नहीं है, बारिश में एम्बुलेंस नहीं आती (175 लोग)", "Gram Sabha: no paved road to the village, the ambulance cannot come in the rain (175 people)", 175),
 ]

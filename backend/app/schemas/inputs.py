@@ -52,7 +52,8 @@ class DecisionIn(BaseModel):
 
 
 class OptimiseIn(BaseModel):
-    country: str
+    country: str | None = "IN"
+    state: str | None = None
     budget: float
     include_approved: bool = True
 

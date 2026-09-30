@@ -11,11 +11,10 @@ from app.core.database import SessionLocal
 from app.channels import conversation
 from app.services.ai import speech
 
-IVR_LANGS = {"1": ("hi", "hi-IN"), "2": ("te", "te-IN"), "3": ("en", "en-IN"), "4": ("pt", "pt-BR"), "5": ("zu", "en-ZA")}
+IVR_LANGS = {"1": ("hi", "hi-IN"), "2": ("te", "te-IN"), "3": ("en", "en-IN"), "4": ("or", "or-IN")}
 PROMPTS = {
     "hi": "कृपया बीप के बाद अपनी समस्या बताइए।", "te": "బీప్ తర్వాత మీ సమస్యను చెప్పండి.",
-    "en": "Please describe the problem in your area after the beep.", "pt": "Depois do sinal, descreva o problema do seu bairro.",
-    "zu": "Ngemva kwe-beep, chaza inkinga yendawo yakho.",
+    "en": "Please describe the problem in your area after the beep.", "or": "ବିପ୍ ପରେ ଆପଣଙ୍କ ସମସ୍ୟା କୁହନ୍ତୁ।",
 }
 
 
@@ -26,7 +25,7 @@ def twiml(inner: str) -> str:
 def menu() -> str:
     base = settings.public_base_url.rstrip("/")
     return twiml(f'<Gather numDigits="1" action="{base}/api/channels/ivr/language" method="POST">'
-                 '<Say language="en-IN">Welcome to JanSetu. For Hindi press 1. Telugu 2. English 3. Portuguese 4. isiZulu 5.</Say>'
+                 '<Say language="en-IN">Welcome to JanSetu. For Hindi press 1. Telugu 2. English 3. Odia 4.</Say>'
                  '</Gather><Redirect>' + base + '/api/channels/ivr/voice</Redirect>')
 
 

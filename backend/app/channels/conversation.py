@@ -16,10 +16,8 @@ WELCOME = {
     "en": "Namaste! This is JanSetu. Tell us, by voice or text in your own language, what your area needs (water, road, electricity, health, school, drains). Send 'status <ID>' to track.",
     "hi": "नमस्ते! यह जनसेतु है। अपनी भाषा में बोलकर या लिखकर बताइए कि आपके इलाके को क्या चाहिए (पानी, सड़क, बिजली, स्वास्थ्य, स्कूल, नाली)।",
     "te": "నమస్కారం! ఇది జనసేతు. మీ ప్రాంతానికి ఏమి కావాలో (నీరు, రోడ్డు, కరెంటు, ఆరోగ్యం, బడి, కాలువ) మీ భాషలో మాట్లాడి లేదా రాసి చెప్పండి.",
-    "pt": "Olá! Aqui é o JanSetu. Conte, por voz ou texto, o que o seu bairro precisa (água, rua, energia, saúde, escola, esgoto).",
-    "zu": "Sawubona! Lena yi-JanSetu. Sitshele ngezwi noma ngombhalo ukuthi indawo yakho idingani (amanzi, umgwaqo, ugesi, ezempilo, isikole, indle).",
 }
-_STATUS = re.compile(r"(status|स्थिति|స్థితి|situação|isimo|статус)\s*[:#]?\s*(JS-[A-Z]{2}-[A-Z0-9]{6})", re.I)
+_STATUS = re.compile(r"(status|स्थिति|స్థితి|ସ୍ଥିତି)\s*[:#]?\s*(JS-[A-Z]{2}-[A-Z0-9]{6})", re.I)
 _TID = re.compile(r"JS-[A-Z]{2}-[A-Z0-9]{6}", re.I)
 
 

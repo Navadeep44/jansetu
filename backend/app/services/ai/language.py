@@ -1,37 +1,32 @@
 """Lightweight language identification that works offline.
-Script-based for Indic / Cyrillic / CJK / Arabic / Ethiopic, keyword-based for Latin scripts."""
+Script-based for Indic scripts (Devanagari, Telugu, Odia, Tamil, Bengali, Urdu), keyword-based for romanised text."""
 import re
 
 LANGUAGES = {
     "en": "English", "hi": "Hindi", "bho": "Bhojpuri", "te": "Telugu", "or": "Odia", "ta": "Tamil",
-    "bn": "Bengali", "mr": "Marathi", "pt": "Portuguese", "zu": "isiZulu", "xh": "isiXhosa",
-    "af": "Afrikaans", "ru": "Russian", "zh": "Chinese", "ar": "Arabic", "am": "Amharic",
-    "fa": "Persian", "id": "Indonesian", "gon": "Gondi",
+    "bn": "Bengali", "mr": "Marathi", "ur": "Urdu", "kn": "Kannada", "ml": "Malayalam", "gu": "Gujarati",
+    "pa": "Punjabi", "gon": "Gondi",
 }
 
 # BCP-47 tags used by browser speech APIs / TTS
 SPEECH_TAGS = {
     "en": "en-IN", "hi": "hi-IN", "bho": "hi-IN", "te": "te-IN", "or": "or-IN", "ta": "ta-IN", "bn": "bn-IN",
-    "mr": "mr-IN", "pt": "pt-BR", "zu": "zu-ZA", "xh": "xh-ZA", "af": "af-ZA", "ru": "ru-RU", "zh": "zh-CN",
-    "ar": "ar-EG", "am": "am-ET", "fa": "fa-IR", "id": "id-ID",
+    "mr": "mr-IN", "ur": "ur-IN", "kn": "kn-IN", "ml": "ml-IN", "gu": "gu-IN", "pa": "pa-IN", "gon": "te-IN",
 }
 
 _SCRIPT_RANGES = [
     ("te", r"[ఀ-౿]"), ("or", r"[଀-୿]"), ("ta", r"[஀-௿]"),
-    ("bn", r"[ঀ-৿]"), ("hi", r"[ऀ-ॿ]"), ("ru", r"[Ѐ-ӿ]"),
-    ("zh", r"[一-鿿]"), ("am", r"[ሀ-፿]"), ("ar", r"[؀-ۿ]"),
+    ("bn", r"[ঀ-৿]"), ("hi", r"[ऀ-ॿ]"), ("kn", r"[ಀ-೿]"), ("ml", r"[ഀ-ൿ]"),
+    ("gu", r"[઀-૿]"), ("pa", r"[਀-੿]"), ("ur", r"[؀-ۿ]"),
 ]
 
 _LATIN_MARKERS = {
-    "pt": ["não", "sem", "está", "rua", "água", "luz", "bairro", "há", "muito", "para", "com", "que", "de", "o posto", "esgoto", "falta", "nós", "minha", "ção", "já", "meu", "nossa", "nosso", "avenida", "buraco", "está", "uma"],
-    "zu": ["asina", "amanzi", "ugesi", "umgwaqo", "izingane", "kusukela", "futhi", "kakhulu", "ayikho", "awukho", "isikole", "ngoba", "sicela", "umtholampilo"],
-    "af": ["ons", "nie", "geen", "water", "krag", "die", "is", "het", "strate", "asseblief"],
-    "id": ["tidak", "ada", "jalan", "air", "listrik", "kami", "sudah", "yang", "dan"],
+    "hi": ["pani", "paani", "nahi", "sadak", "bijli", "hamare", "gaon", "mein", "hai", "kripya", "naali", "hospital nahi"],
+    "te": ["neellu", "ledu", "roddu", "current ledu", "maa ooru", "undi", "cheyandi", "baaga"],
     "en": ["the", "no", "is", "and", "our", "we", "not", "water", "road", "please", "there", "since", "village"],
 }
 
 _BHOJPURI_MARKERS = ["बाड़", "नइखे", "हमनी", "बा ", "जाला", "आवेला", "लइकन"]
-_PERSIAN_MARKERS = ["پ", "چ", "ژ", "گ", "ی"]
 
 
 def detect_language(text: str, hint: str | None = None) -> tuple[str, float]:
@@ -51,8 +46,6 @@ def detect_language(text: str, hint: str | None = None) -> tuple[str, float]:
         share = counts[code] / max(1, len(re.sub(r"\s", "", t)))
         if code == "hi" and any(m in t for m in _BHOJPURI_MARKERS):
             return "bho", 0.75
-        if code == "ar" and any(m in t for m in _PERSIAN_MARKERS):
-            return "fa", 0.7
         return code, round(min(0.99, 0.6 + share * 0.4), 2)
     low = " " + t.lower() + " "
     scores = {}

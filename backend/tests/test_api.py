@@ -24,14 +24,14 @@ def client():
 def test_health_and_meta(client):
     assert client.get("/api/health").json()["status"] == "ok"
     m = client.get("/api/meta").json()
-    assert "water" in m["sectors"] and len(m["countries"]) >= 10
+    assert "water" in m["sectors"] and len(m["states"]) == 5
 
 
 @pytest.mark.parametrize("text,lang,sector", [
     ("మా ఊరిలో తాగునీరు లేదు, బోరు పాడైపోయింది. ఉట్నూర్", "te", "water"),
     ("गाँव तक पक्की सड़क नहीं है, बारिश में एम्बुलेंस नहीं आ पाती। Seelampur", "hi", "roads"),
-    ("Esgoto a céu aberto na frente das casas em Grajaú, crianças doentes", "pt", "sanitation"),
-    ("Awukho ugesi kusukela izolo eSoweto, i-load shedding ayipheli", "zu", "electricity"),
+    ("ଆମ ଗାଁରେ ପିଇବା ପାଣି ନାହିଁ, ନଳକୂଅ ଖରାପ ହୋଇଛି। Lamtaput", "or", "water"),
+    ("हमनी के गली में नाली उफना जाला, सीवर के पानी से लइकन बेमार हो जात बाड़न। Bawana", "bho", "sanitation"),
 ])
 def test_multilingual_intake_clusters_and_replies(client, text, lang, sector):
     r = client.post("/api/intake/text", json={"text": text, "phone": f"+1{hash(text) % 10**9}"}).json()
@@ -55,7 +55,7 @@ def test_needs_location_then_follow_up(client):
 
 
 def test_urgent_safety_flag(client):
-    r = client.post("/api/intake/text", json={"text": "Gas leak near the school in Soweto, children trapped!"}).json()
+    r = client.post("/api/intake/text", json={"text": "Gas leak near the school in Malakpet, children trapped!"}).json()
     assert "urgent_safety" in r["understanding"]["flags"] and r["reply_kind"] == "safety"
 
 
@@ -65,8 +65,12 @@ def test_analytics(client):
     ng = client.get("/api/analytics/need-gap?country=IN&w_demand=0&limit=5").json()
     assert ng["weights"]["demand"] == 0 and len(ng["items"]) == 5
     assert client.get("/api/analytics/silent-zones").json()
-    assert "IN" in client.get("/api/analytics/alignment").json()
-    assert any(a["area"] == "Soweto" for a in client.get("/api/analytics/alerts").json())
+    assert "Telangana" in client.get("/api/analytics/alignment").json()
+    assert "India" in client.get("/api/analytics/alignment?national=true").json()
+    assert any(a["area"] == "Malakpet" for a in client.get("/api/analytics/alerts").json())
+    st = client.get("/api/analytics/states").json()
+    assert {s["state"] for s in st} == {"Telangana", "Odisha", "Delhi", "Bihar", "Uttar Pradesh"}
+    assert client.get("/api/analytics/overview?state=Bihar").json()["total_requests"] < ov["total_requests"]
     areas = client.get("/api/analytics/areas").json()
     assert all("hotspot" in a for a in areas)
 
@@ -82,7 +86,7 @@ def test_projects_explain_decide_optimise(client):
     assert ok["project"]["status"] == "approved"
     denied = client.post(f"/api/projects/{recs[1]['id']}/decision", json={"decision": "approve"})
     assert denied.status_code == 401  # citizens (no login) cannot decide
-    opt = client.post("/api/projects/optimise", json={"country": "IN", "budget": 5e8}).json()
+    opt = client.post("/api/projects/optimise", json={"budget": 5e8}).json()
     assert opt["total_cost"] <= 5e8 and opt["selected"]
 
 
@@ -106,24 +110,25 @@ def test_nl_query_and_brief(client):
     assert q["intent"]["intent"] == "silent_zones" and q["rows"]
     q2 = client.post("/api/query", json={"question": "सबसे ज़्यादा पानी की समस्या कहाँ है?"}).json()
     assert q2["intent"]["sector"] == "water"
-    b = client.get("/api/briefs?country=IN&district=Koraput").json()
+    b = client.get("/api/briefs?state=Odisha&district=Koraput").json()
     assert b["top_needs"] and b["key_findings"]
 
 
-def test_impact_and_brics(client):
+def test_impact_and_gram_sabha_plan(client):
     imp = client.get("/api/impact/projects").json()
     assert imp and all(i["did_estimate"] < 0 for i in imp)
     k = client.get("/api/impact/kpis").json()
     assert k["inclusion"]["voice_share"] > 0
-    ex = client.get("/api/brics/exchange").json()
-    assert {n["country"] for n in ex} >= {"IN", "BR", "ZA", "RU", "CN"}
-    live = next(n for n in ex if n["country"] == "IN")
-    assert "households_reporting" in live["sectors"]["water"]
+    gp = client.get("/api/plans/gram-sabha?district=Adilabad").json()
+    assert gp["items"] and gp["items"][0]["priority"] == 1 and gp["items"][0]["estimated_cost_inr"] > 0
+    assert client.get("/api/plans/gram-sabha.csv?district=Gaya").text.startswith("priority,area")
+    q = client.post("/api/query", json={"question": "తెలంగాణలో నీటి సమస్య ఎక్కడ ఎక్కువ?"}).json()
+    assert q["intent"]["state"] == "Telangana" and q["intent"]["sector"] == "water"
 
 
 def test_open311_and_community(client):
     assert len(client.get("/open311/v2/services.json").json()) == 6
-    created = client.post("/open311/v2/requests.json", json={"description": "Street light not working in Moema", "lat": -23.6, "long": -46.665}).json()
+    created = client.post("/open311/v2/requests.json", json={"description": "Street light not working in Kukatpally", "lat": 17.485, "long": 78.411}).json()
     rid = created[0]["service_request_id"]
     assert client.get(f"/open311/v2/requests/{rid}.json").json()[0]["service_code"] == "electricity"
     areas = client.get("/api/areas?country=IN").json()
@@ -160,8 +165,8 @@ def test_me_too_my_requests_board_export(client):
     assert mine and mine[0]["tracking_id"] == r["tracking_id"]
     b = client.get("/api/public/board").json()
     assert b["completed"] >= 4 and b["items"]
-    csv_text = client.get("/api/export/need-gap.csv?country=IN").text
-    assert csv_text.startswith("country,state,district") and "Narnoor" in csv_text
+    csv_text = client.get("/api/export/need-gap.csv").text
+    assert csv_text.startswith("state,district") and "Narnoor" in csv_text
 
 
 def test_citizen_can_answer_where(client):

@@ -24,8 +24,8 @@ SUB_LABELS = {
 
 _LATIN = re.compile(r"^[a-z0-9 '\-]+$")
 _COLLECTIVE = ["village", "whole", "everyone", "all families", "colony", "गाँव", "पूरे", "మా ఊరి", "గ్రామ", "ఊరిలో", "ଗାଁ",
-               "bairro", "comunidade", "todos", "vizinhança", "umphakathi", "sonke", "деревн", "村"]
-_HOUSEHOLD_WORDS = r"(families|households|houses|people|परिवार|घर|लोग|కుటుంబాలు|ఇళ్లు|మంది|ପରିବାର|famílias|casas|pessoas|imindeni|abantu|семей|человек|户|人)"
+               "basti", "mohalla", "बस्ती", "मोहल्ला", "కాలనీ", "బస్తీ", "ward", "gram panchayat", "ग्राम पंचायत"]
+_HOUSEHOLD_WORDS = r"(families|households|houses|people|परिवार|घर|लोग|కుటుంబాలు|ఇళ్లు|మంది|ପରିବାର|ଜଣ|जन)"
 
 
 def _match(text_low: str, term: str) -> bool:

@@ -42,7 +42,7 @@ def request_out(r: CitizenRequest, full: bool = False) -> dict:
 
 def cluster_out(c: DemandCluster) -> dict:
     return {"id": c.id, "country": c.country_code, "area_id": c.area_id, "area": c.area.name if c.area else None,
-            "district": c.area.district if c.area else None, "lat": c.area.lat if c.area else None,
+            "district": c.area.district if c.area else None, "state": c.area.state if c.area else None, "lat": c.area.lat if c.area else None,
             "lng": c.area.lng if c.area else None, "category": c.category, "category_label": sector_label(c.category),
             "subcategory": c.subcategory, "title": c.title, "summary": c.summary, "request_count": c.request_count,
             "unique_households": c.unique_households, "supporters": c.supporters, "severity_avg": c.severity_avg,
@@ -56,7 +56,7 @@ def project_out(p: Project) -> dict:
             "lat": p.area.lat if p.area else None, "lng": p.area.lng if p.area else None, "cluster_id": p.cluster_id,
             "sector": p.sector, "sector_label": sector_label(p.sector), "title": p.title, "description": p.description,
             "scheme": p.scheme, "sdg": p.sdg, "cost_local": p.cost_local, "cost_usd": p.cost_usd,
-            "currency": {"IN": "INR", "BR": "BRL", "ZA": "ZAR"}.get(p.country_code, "USD"),
+            "currency": "INR", "state": p.area.state if p.area else None,
             "beneficiaries": p.beneficiaries, "status": p.status, "score": p.score, "score_breakdown": p.score_breakdown,
             "decision_reason": p.decision_reason, "decided_by": p.decided_by, "created_at": iso(p.created_at),
             "started_at": iso(p.started_at), "completed_at": iso(p.completed_at)}
