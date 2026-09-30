@@ -10,7 +10,7 @@ from datetime import datetime, timedelta
 from sqlalchemy.orm import Session
 
 from app.core.i18n import EMERGENCY_NUMBERS, t
-from app.models import Area, CitizenRequest, Notification
+from app.models import Area, CitizenRequest, Notification, StatusHistory, ProofUpload
 from app.services import analytics_cache, clustering, privacy
 from app.services.ai.extraction import extract
 from app.services.geo import gazetteer
@@ -20,9 +20,23 @@ LANG_COUNTRY = {"pt": "BR", "zu": "ZA", "xh": "ZA", "af": "ZA", "te": "IN", "hi"
                 "fa": "IR", "id": "ID"}
 _ALPH = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
 
+SECTOR_DEPARTMENTS = {
+    "water": "Public Health Engineering & Water Supply",
+    "roads": "Roads & Rural Infrastructure Development",
+    "electricity": "Electricity & Power Distribution Board",
+    "health": "Health & Family Welfare Department",
+    "education": "School Education & Literacy Department",
+    "sanitation": "Municipal Sanitation & Drainage Authority",
+    "other": "General Grievance Redressal Division",
+}
+
+
+def get_department_for_sector(sector: str) -> str:
+    return SECTOR_DEPARTMENTS.get(sector, SECTOR_DEPARTMENTS["other"])
+
 
 def new_tracking_id(country: str) -> str:
-    return f"JS-{country or 'XX'}-" + "".join(secrets.choice(_ALPH) for _ in range(6))
+    return f"JS-{country or 'XX'}-" + "".join(secrets.choice(_ALPH) for _ in range(10))
 
 
 def notify(db: Session, req: CitizenRequest, kind: str, message: str) -> Notification:
@@ -30,6 +44,55 @@ def notify(db: Session, req: CitizenRequest, kind: str, message: str) -> Notific
                      delivered=req.channel in ("web", "assisted", "community", "simulator"))
     db.add(n)
     return n
+
+
+def record_status_transition(
+    db: Session,
+    req: CitizenRequest,
+    *,
+    status: str,
+    stage_label: str,
+    actor_role: str = "system",
+    actor_name: str = "System",
+    department: str = "",
+    note: str = "",
+    notify_message: str | None = None,
+    notify_kind: str = "status_update",
+    created_at: datetime | None = None,
+    public_visible: bool = True,
+) -> StatusHistory:
+    """Record an immutable lifecycle stage transition and notify the citizen."""
+    ts = created_at or datetime.utcnow()
+    req.status = status
+    req.updated_at = ts
+
+    if status == "assigned":
+        req.assigned_at = ts
+    elif status == "in_progress":
+        req.in_progress_at = ts
+    elif status in ("resolved_pending_verification", "resolved"):
+        req.resolved_at = ts
+    elif status in ("closed", "closed_verified"):
+        req.closed_at = ts
+
+    dept = department or req.assigned_department or get_department_for_sector(req.category)
+    sh = StatusHistory(
+        request_id=req.id,
+        status=status,
+        stage_label=stage_label,
+        actor_role=actor_role,
+        actor_name=actor_name,
+        department=dept,
+        note=note,
+        public_visible=public_visible,
+        created_at=ts,
+    )
+    db.add(sh)
+
+    if notify_message:
+        notify(db, req, notify_kind, notify_message)
+
+    return sh
 
 
 def process(db: Session, *, text: str, channel: str = "web", lang_hint: str | None = None,
@@ -70,7 +133,7 @@ def process(db: Session, *, text: str, channel: str = "web", lang_hint: str | No
         severity=x["severity"], affected_people=int(x.get("affected_people") or 1), vulnerable_groups=x["vulnerable_groups"],
         sdg=x["sdg"], confidence=x["confidence"], extraction_mode=x["extraction_mode"],
         household_hash=privacy.household_hash(identifier), anonymous=anonymous, gender=gender, assisted_by=assisted_by,
-        supporters=max(1, supporters), flags=flags, created_at=created_at or datetime.utcnow(),
+        supporters=max(1, supporters), flags=flags, proof_count=0, created_at=created_at or datetime.utcnow(),
         updated_at=created_at or datetime.utcnow(),
     )
     req.area = area
@@ -100,10 +163,35 @@ def process(db: Session, *, text: str, channel: str = "web", lang_hint: str | No
             req.cluster_id = cluster.id
             db.flush()
             clustering.recompute(db, cluster)
-    req.status = "needs_review" if needs_review else ("clustered" if cluster else "received")
+    initial_status = "needs_review" if needs_review else ("clustered" if cluster else "received")
+    req.status = initial_status
+    area_name = area.name if area else ""
+
+    # --- record initial lifecycle status history ---------------------------------------------
+    record_status_transition(
+        db, req,
+        status="received",
+        stage_label="Received",
+        actor_role="citizen",
+        actor_name="Citizen",
+        department=get_department_for_sector(req.category),
+        note=f"Grievance recorded via {channel}. Tracking ID {req.tracking_id} generated.",
+        created_at=req.created_at,
+    )
+    if cluster and initial_status == "clustered":
+        record_status_transition(
+            db, req,
+            status="clustered",
+            stage_label="Grouped with Nearby Demands",
+            actor_role="system",
+            actor_name="AI Demand Aggregator",
+            department=get_department_for_sector(req.category),
+            note=f"Aggregated with {cluster.unique_households} households in {area_name} facing similar issues.",
+            created_at=req.created_at,
+        )
+    req.status = initial_status
 
     # --- reply in the citizen's language -----------------------------------------------------
-    area_name = area.name if area else ""
     others = max(0, (cluster.unique_households - 1)) if cluster else 0
     if "urgent_safety" in req.flags:
         kind, msg = "safety", t("safety", req.language, number=EMERGENCY_NUMBERS.get(country, "112"))
