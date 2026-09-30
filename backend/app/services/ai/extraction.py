@@ -108,12 +108,34 @@ def rule_extract(text: str, lang_hint: str | None = None) -> dict:
         flags.append("abusive")
     if len(low.strip()) < 12:
         flags.append("too_short")
+    sub_label = SUB_LABELS.get(sub, sub.replace("_", " "))
+    cat_label = sector_label(sector)
+    if lang == "hi":
+        native_summary = f"जनसेतु की समझ: {cat_label} की समस्या ({sub_label})। गंभीरता: {severity}/5।"
+        clarifying_question = "क्या यह विवरण आपकी समस्या से सही मेल खाता है, या आप कोई अन्य विवरण जोड़ना चाहते हैं?"
+    elif lang == "te":
+        native_summary = f"జనసేతు గ్రహించినది: {cat_label} సమస్య ({sub_label}). తీవ్రత: {severity}/5."
+        clarifying_question = "ఈ వివరాలు మీ సమస్యకు సరిపోతాయా, లేదా మీరు మరిన్ని వివరాలు చేర్చాలనుకుంటున్నారా?"
+    elif lang == "ta":
+        native_summary = f"ஜன்சேது புரிந்துகொண்டது: {cat_label} பிரச்சினை ({sub_label}). தீவிரம்: {severity}/5."
+        clarifying_question = "இந்த விவரம் உங்கள் பிரச்சினையுடன் சரியாகப் பொருந்துகிறதா?"
+    elif lang == "mr":
+        native_summary = f"जनसेतूचे आकलन: {cat_label} समस्या ({sub_label}). तीव्रता: {severity}/5."
+        clarifying_question = "हा तपशील आपल्या समस्येशी जुळतो का?"
+    elif lang == "pt":
+        native_summary = f"JanSetu entendeu: Problema de {cat_label} ({sub_label}). Gravidade: {severity}/5."
+        clarifying_question = "Este resumo descreve com precisão o seu problema?"
+    else:
+        native_summary = f"JanSetu understood: {cat_label} issue ({sub_label}). Severity: {severity}/5."
+        clarifying_question = "Does this summary accurately describe your issue, or would you like to add specific location details?"
+
     return {
         "language": lang, "language_name": LANGUAGES.get(lang, lang), "language_confidence": lang_conf,
-        "category": sector, "category_label": sector_label(sector), "subcategory": sub,
-        "subcategory_label": SUB_LABELS.get(sub, sub), "request_type": rtype, "severity": severity,
+        "category": sector, "category_label": cat_label, "subcategory": sub,
+        "subcategory_label": sub_label, "request_type": rtype, "severity": severity,
         "vulnerable_groups": vulnerable, "affected_people": _affected(low), "sdg": sector_sdg(sector),
         "confidence": round(confidence * (0.7 + 0.3 * lang_conf), 2), "flags": flags,
+        "native_summary": native_summary, "clarifying_question": clarifying_question,
         "translated_text": text if lang == "en" else offline_gist(sector, sub, vulnerable, severity),
         "translation_mode": "source" if lang == "en" else "offline_gist", "extraction_mode": "rules",
         "sector_scores": scores,
@@ -137,7 +159,6 @@ Never invent facts. Keep names of people out of the output."""
 def extract(text: str, lang_hint: str | None = None) -> dict:
     result = rule_extract(text, lang_hint)
     result["location_mentions"] = []
-    result["clarifying_question"] = None
     llm = providers.chat_json(LLM_SYSTEM, f"Language hint: {result['language_name']}\nCitizen message:\n{text}")
     if isinstance(llm, dict) and llm.get("category") in list(SECTORS) + ["other"]:
         for key in ("translated_text", "category", "subcategory", "request_type", "affected_people",

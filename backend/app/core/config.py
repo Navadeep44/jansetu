@@ -50,12 +50,29 @@ class Settings(BaseSettings):
     # Approximate FX for cross-country comparison (illustrative, update from a feed in prod)
     fx_inr_usd: float = 0.0115
 
+    # SLA hours by severity/urgency level (1..5)
+    sla_hours_critical: int = 48
+    sla_hours_high: int = 96
+    sla_hours_medium: int = 168
+    sla_hours_low: int = 240
+    sla_hours_minimal: int = 336
+
     @property
     def llm_enabled(self) -> bool:
         if self.llm_provider == "none":
             return False
         # local OpenAI-compatible servers (Ollama / vLLM) need no key
         return bool(self.llm_api_key) or "localhost" in self.llm_base_url or "127.0.0.1" in self.llm_base_url
+
+    @property
+    def sla_hours_by_severity(self) -> dict[int, int]:
+        return {
+            5: self.sla_hours_critical,
+            4: self.sla_hours_high,
+            3: self.sla_hours_medium,
+            2: self.sla_hours_low,
+            1: self.sla_hours_minimal,
+        }
 
 
 @lru_cache
@@ -64,3 +81,4 @@ def get_settings() -> Settings:
 
 
 settings = get_settings()
+DEFAULT_SLA_HOURS = settings.sla_hours_by_severity

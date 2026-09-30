@@ -69,6 +69,32 @@ AREAS = [
     ("IN", "Uttar Pradesh", "Bahraich", "Kaiserganj", ["कैसरगंज"], "block", "rural", 27.250, 81.540, 250000, 42000, 0.70, 0.40, 0.33, _i(.45, .48, .68, .26, .45, .28), ["hi"]),
     ("IN", "Uttar Pradesh", "Bahraich", "Payagpur", ["पयागपुर"], "block", "rural", 27.400, 81.930, 220000, 37000, 0.72, 0.36, 0.30, _i(.42, .44, .64, .23, .42, .26), ["hi"]),
     ("IN", "Uttar Pradesh", "Bahraich", "Shivpur", ["शिवपुर"], "block", "rural", 27.720, 81.710, 180000, 30000, 0.82, 0.20, 0.16, _i(.28, .26, .52, .10, .34, .16), ["hi"]),
+    # ---------------- India: Maharashtra, Pune (urban + peri-urban; Marathi + Hindi) ----------------
+    ("IN", "Maharashtra", "Pune", "Haveli", ["हवेली", "Haveli"], "block", "peri-urban", 18.520, 73.856, 320000, 75000, 0.38, 0.78, 0.82, _i(.75, .78, .88, .75, .80, .70), ["mr", "hi", "en"]),
+    ("IN", "Maharashtra", "Pune", "Baramati", ["बारामती", "Baramati"], "block", "rural", 18.150, 74.580, 180000, 42000, 0.45, 0.70, 0.75, _i(.70, .72, .85, .68, .72, .65), ["mr", "hi"]),
+    # ---------------- India: Karnataka, Bengaluru Urban (Kannada + English) ----------------
+    ("IN", "Karnataka", "Bengaluru Urban", "Anekal", ["ಆನೇಕಲ್", "Anekal"], "block", "peri-urban", 12.710, 77.696, 290000, 68000, 0.40, 0.75, 0.80, _i(.72, .75, .86, .72, .76, .68), ["kn", "en", "hi"]),
+    # ---------------- Brazil: São Paulo (subprefeituras / distritos) ----------------
+    ("BR", "São Paulo", "São Paulo", "Capão Redondo", ["Capao Redondo"], "district", "urban", -23.670, -46.780, 285000, 90000, 0.66, 0.72, 0.70, _i(.78, .55, .85, .48, .45, .60), ["pt"]),
+    ("BR", "São Paulo", "São Paulo", "Grajaú", ["Grajau"], "district", "urban", -23.785, -46.670, 385000, 118000, 0.72, 0.65, 0.65, _i(.60, .45, .82, .42, .40, .38), ["pt"]),
+    ("BR", "São Paulo", "São Paulo", "Jardim Ângela", ["Jardim Angela"], "district", "urban", -23.712, -46.772, 330000, 102000, 0.70, 0.66, 0.66, _i(.65, .48, .83, .40, .42, .40), ["pt"]),
+    ("BR", "São Paulo", "São Paulo", "Cidade Tiradentes", ["Tiradentes"], "district", "urban", -23.582, -46.400, 215000, 66000, 0.68, 0.68, 0.68, _i(.72, .55, .84, .45, .42, .50), ["pt"]),
+    ("BR", "São Paulo", "São Paulo", "Brasilândia", ["Brasilandia"], "district", "urban", -23.460, -46.690, 280000, 87000, 0.66, 0.70, 0.68, _i(.70, .50, .84, .46, .45, .48), ["pt"]),
+    ("BR", "São Paulo", "São Paulo", "Itaim Paulista", ["Itaim"], "district", "urban", -23.500, -46.400, 230000, 72000, 0.62, 0.72, 0.70, _i(.74, .58, .86, .50, .48, .55), ["pt"]),
+    ("BR", "São Paulo", "São Paulo", "Parelheiros", ["Parelheiros"], "district", "rural", -23.830, -46.730, 150000, 45000, 0.78, 0.38, 0.40, _i(.40, .30, .72, .30, .35, .22), ["pt"]),
+    ("BR", "São Paulo", "São Paulo", "Marsilac", ["Marsilac"], "district", "rural", -23.905, -46.705, 9000, 2800, 0.80, 0.22, 0.30, _i(.30, .20, .65, .25, .30, .15), ["pt"]),
+    ("BR", "São Paulo", "São Paulo", "Pinheiros", ["Pinheiros"], "district", "urban", -23.567, -46.690, 65000, 29000, 0.08, 0.97, 0.96, _i(.98, .90, .98, .92, .92, .96), ["pt"]),
+    ("BR", "São Paulo", "São Paulo", "Moema", ["Moema"], "district", "urban", -23.600, -46.665, 83000, 36000, 0.06, 0.98, 0.97, _i(.98, .88, .98, .93, .93, .97), ["pt"]),
+    ("BR", "São Paulo", "São Paulo", "Vila Mariana", ["Vila Mariana"], "district", "urban", -23.589, -46.635, 137000, 58000, 0.08, 0.97, 0.96, _i(.98, .90, .98, .93, .93, .96), ["pt"]),
+    # ---------------- South Africa: Gauteng (Johannesburg / Ekurhuleni) ----------------
+    ("ZA", "Gauteng", "Johannesburg", "Soweto", ["Soweto", "eSoweto"], "township", "urban", -26.265, 27.858, 1270000, 355000, 0.60, 0.70, 0.60, _i(.62, .60, .40, .50, .55, .55), ["zu", "en", "xh"]),
+    ("ZA", "Gauteng", "Johannesburg", "Alexandra", ["Alex", "Alexandra"], "township", "urban", -26.103, 28.097, 180000, 62000, 0.72, 0.66, 0.58, _i(.55, .50, .72, .45, .48, .35), ["zu", "en"]),
+    ("ZA", "Gauteng", "Johannesburg", "Diepsloot", ["Diepsloot"], "township", "urban", -25.933, 28.012, 350000, 125000, 0.80, 0.55, 0.50, _i(.30, .35, .38, .30, .35, .25), ["zu", "en", "xh"]),
+    ("ZA", "Gauteng", "Johannesburg", "Orange Farm", ["Orange Farm"], "township", "urban", -26.480, 27.865, 260000, 84000, 0.82, 0.35, 0.45, _i(.35, .30, .42, .28, .35, .22), ["zu", "en"]),
+    ("ZA", "Gauteng", "Johannesburg", "Ivory Park", ["Ivory Park"], "township", "urban", -25.990, 28.190, 185000, 64000, 0.76, 0.52, 0.50, _i(.42, .40, .45, .36, .42, .30), ["zu", "en"]),
+    ("ZA", "Gauteng", "Ekurhuleni", "Tembisa", ["Tembisa"], "township", "urban", -25.998, 28.227, 465000, 150000, 0.66, 0.66, 0.58, _i(.55, .55, .45, .45, .50, .45), ["zu", "en"]),
+    ("ZA", "Gauteng", "Johannesburg", "Sandton", ["Sandton"], "suburb", "urban", -26.107, 28.056, 220000, 90000, 0.08, 0.96, 0.95, _i(.92, .88, .70, .92, .92, .92), ["en", "af"]),
+    ("ZA", "Gauteng", "Johannesburg", "Midrand", ["Midrand"], "suburb", "urban", -25.990, 28.128, 175000, 68000, 0.15, 0.92, 0.90, _i(.88, .86, .70, .88, .88, .88), ["en"]),
 ]
 
-ADMIN_PREFIX = {"IN": "LGD"}
+ADMIN_PREFIX = {"IN": "LGD", "BR": "IBGE-3550308", "ZA": "STATSSA-798"}

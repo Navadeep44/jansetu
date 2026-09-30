@@ -30,7 +30,12 @@ class PreviewIn(BaseModel):
 
 
 class VerifyIn(BaseModel):
-    fixed: bool
+    fixed: bool = True
+    rating: int | None = Field(default=None, ge=1, le=5)
+    comment: str = ""
+
+
+class ConfirmIn(BaseModel):
     rating: int | None = Field(default=None, ge=1, le=5)
     comment: str = ""
 
@@ -41,9 +46,50 @@ class ReviewIn(BaseModel):
     action: str = "approve"  # approve | reject_spam | mark_emergency_handled
 
 
+class ProofItemIn(BaseModel):
+    file_url: str
+    file_name: str = "resolution_proof.jpg"
+    file_type: str = "photo"  # photo | document
+    file_size: int = 0
+    mime_type: str = "image/jpeg"
+    lat: float | None = None
+    lng: float | None = None
+    exif_metadata: dict = Field(default_factory=dict)
+
+
+class ResolveWithProofIn(BaseModel):
+    closure_note: str = Field(..., min_length=5)
+    officer_name: str = "Field Officer"
+    department: str = ""
+    proofs: list[ProofItemIn] = Field(..., min_length=1)
+    force: bool = False
+
+
+class AssignIn(BaseModel):
+    officer_name: str
+    department: str = ""
+    note: str = ""
+
+
+class ProgressIn(BaseModel):
+    officer_name: str = ""
+    note: str = "Field work commenced on site"
+
+
+class DisputeIn(BaseModel):
+    reason: str = Field(..., min_length=2)
+    photo: str | None = None
+
+
+class FlagProofIn(BaseModel):
+    suspicious: bool = True
+    reason: str = "Flagged by supervisor for audit inspection"
+
+
 class CloseIn(BaseModel):
     closure_note: str
     force: bool = False
+    proofs: list[ProofItemIn] = Field(default_factory=list)
 
 
 class DecisionIn(BaseModel):
@@ -76,3 +122,4 @@ class ReplyIn(BaseModel):
     area_id: int | None = None
     lat: float | None = None
     lng: float | None = None
+

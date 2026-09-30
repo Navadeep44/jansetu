@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 
 from app.core.database import get_db
 from app.core.i18n import t
+from app.core import security
 from app.core.security import PLANNER_ROLES, require
 from app.models import Area, AuditLog, CitizenRequest, DemandCluster, Project
 from app.schemas.inputs import DecisionIn, OptimiseIn
@@ -19,8 +20,12 @@ TRANSITIONS = {"approve": "approved", "defer": "deferred", "reject": "rejected",
 
 @router.get("")
 def list_projects(source: str | None = None, country: str | None = None, state: str | None = None, status: str | None = None, sector: str | None = None,
-                  limit: int = 100, db: Session = Depends(get_db)):
+                  limit: int = 100, claims: dict = Depends(security.get_current_user_claims), db: Session = Depends(get_db)):
     q = db.query(Project)
+    
+    # Jurisdiction Scoping
+    q = security.apply_jurisdiction_scope(q, claims, Project, db)
+
     if source:
         q = q.filter(Project.source == source)
     if state:
