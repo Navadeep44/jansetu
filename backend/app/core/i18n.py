@@ -12,6 +12,7 @@ SECTOR_NAMES = {
     "kn": {"water": "ಕುಡಿಯುವ ನೀರು", "roads": "ರಸ್ತೆಗಳು", "electricity": "ವಿದ್ಯುತ್", "health": "ಆರೋಗ್ಯ", "education": "ಶಿಕ್ಷಣ", "sanitation": "ನೈರ್ಮಲ್ಯ", "other": "ಇತರ"},
     "ml": {"water": "കുടിവെള്ളം", "roads": "റോഡുകൾ", "electricity": "വൈദ്യുതി", "health": "ആരോഗ്യം", "education": "വിദ്യാഭ്യാസം", "sanitation": "ശുചിത്വം", "other": "മറ്റുള്ളവ"},
     "pa": {"water": "ਪੀਣ ਵਾਲਾ ਪਾਣੀ", "roads": "ਸੜਕਾਂ", "electricity": "ਬਿਜਲੀ", "health": "ਸਿਹਤ", "education": "ਸਿੱਖਿਆ", "sanitation": "ਸਫ਼ਾਈ", "other": "ਹੋਰ"},
+    "or": {"water": "ପାଣି", "roads": "ରାସ୍ତା", "electricity": "ବିଜୁଳି", "health": "ସ୍ୱାସ୍ଥ୍ୟ", "education": "ଶିକ୍ଷା", "sanitation": "ପରିମଳ", "other": "ଅନ୍ୟ"},
     "bho": {"water": "पानी", "roads": "सड़क", "electricity": "बिजली", "health": "दवाई-इलाज", "education": "पढ़ाई", "sanitation": "सफाई", "other": "दूसर"},
     "pt": {"water": "Água", "roads": "Vias e acesso", "electricity": "Energia e iluminação", "health": "Saúde", "education": "Educação", "sanitation": "Saneamento", "other": "Outro"},
     "zu": {"water": "Amanzi", "roads": "Imigwaqo", "electricity": "Ugesi", "health": "Ezempilo", "education": "Imfundo", "sanitation": "Ukuthuthwa kwendle", "other": "Okunye"},

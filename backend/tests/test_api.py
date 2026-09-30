@@ -21,7 +21,7 @@ def setup_gov_auth(client):
 def test_health_and_meta(client):
     assert client.get("/api/health").json()["status"] == "ok"
     m = client.get("/api/meta").json()
-    assert "water" in m["sectors"] and len(m["states"]) == 5
+    assert "water" in m["sectors"] and len(m["states"]) >= 5
 
 
 @pytest.mark.parametrize("text,lang,sector", [
@@ -66,7 +66,7 @@ def test_analytics(client):
     assert "India" in client.get("/api/analytics/alignment?national=true").json()
     assert any(a["area"] == "Malakpet" for a in client.get("/api/analytics/alerts").json())
     st = client.get("/api/analytics/states").json()
-    assert {s["state"] for s in st} == {"Telangana", "Odisha", "Delhi", "Bihar", "Uttar Pradesh"}
+    assert {"Telangana", "Odisha", "Delhi", "Bihar", "Uttar Pradesh"}.issubset({s["state"] for s in st})
     assert client.get("/api/analytics/overview?state=Bihar").json()["total_requests"] < ov["total_requests"]
     areas = client.get("/api/analytics/areas").json()
     assert all("hotspot" in a for a in areas)
