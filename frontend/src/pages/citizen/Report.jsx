@@ -108,10 +108,10 @@ function ResultView({ result, setResult, onNew }) {
   const t = useT()
   const r = result
   const [copied, setCopied] = useState(false)
-  const tone = r.reply_kind === 'safety' ? 'alert-danger' : ['ask_location', 'clarify'].includes(r.reply_kind) ? 'alert-warn' : 'alert-success'
+  const tone = r?.reply_kind === 'safety' ? 'alert-danger' : ['ask_location', 'clarify'].includes(r?.reply_kind) ? 'alert-warn' : 'alert-success'
   const share = async () => {
-    const msg = `${t('My JanSetu tracking ID')}: ${r.tracking_id}`
-    const url = `${window.location.origin}/track/${r.tracking_id}`
+    const msg = `${t('My JanSetu tracking ID')}: ${r?.tracking_id}`
+    const url = `${window.location.origin}/track/${r?.tracking_id}`
     try {
       if (navigator.share) { await navigator.share({ title: 'JanSetu', text: msg, url }); return }
       await navigator.clipboard.writeText(`${msg} ${url}`)
@@ -129,21 +129,21 @@ function ResultView({ result, setResult, onNew }) {
       <PageHead title="We got your request" eyebrow="For citizens · no login needed" icon={CheckCircle2} overlap={false}>Keep this number. We will message you at every step.</PageHead>
       <section className="card" style={{ textAlign: 'center' }} aria-labelledby="tid-label">
         <div id="tid-label" className="small muted" style={{ fontWeight: 600 }}>{t('Your tracking ID')}</div>
-        <div className="cz-bigid mt" aria-live="polite">{r.tracking_id}</div>
+        <div className="cz-bigid mt" aria-live="polite">{r?.tracking_id}</div>
         <div className="row mt" style={{ justifyContent: 'center' }}>
-          <SpeakButton text={r.reply} lang={r.request.language} className="btn btn-primary btn-lg" />
+          <SpeakButton text={r?.reply || r?.message || ''} lang={r?.request?.language || 'te'} className="btn btn-primary btn-lg" />
           <button type="button" className="btn btn-lg" onClick={share}>
             {copied ? <Check size={18} aria-hidden="true" /> : navigator.share ? <Share2 size={18} aria-hidden="true" /> : <Copy size={18} aria-hidden="true" />}
             {copied ? t('Copied') : navigator.share ? t('Share') : t('Copy')}
           </button>
         </div>
         <div className={`alert ${tone} mt`} role="status" style={{ textAlign: 'left' }}>
-          {r.reply_kind === 'safety' ? <ShieldAlert size={22} aria-hidden="true" /> : <CheckCircle2 size={22} aria-hidden="true" />}
-          <strong style={{ fontSize: '1.02rem' }}>{r.reply}</strong>
+          {r?.reply_kind === 'safety' ? <ShieldAlert size={22} aria-hidden="true" /> : <CheckCircle2 size={22} aria-hidden="true" />}
+          <strong style={{ fontSize: '1.02rem' }}>{r?.reply || r?.message || t('Grievance registered successfully.')}</strong>
         </div>
       </section>
 
-      {r.request.waiting_for && (
+      {r?.request?.waiting_for && (
         <div className="card action-card">
           <h2>{r.request.waiting_for === 'location' ? t('One more thing: where is this?') : t('Please tell us a little more')}</h2>
           <ReplyBox tid={r.tracking_id} waitingFor={r.request.waiting_for}
@@ -158,23 +158,70 @@ function ResultView({ result, setResult, onNew }) {
               <span><span className="muted">{i + 1}. </span>{t(s.text)}</span></li>
           ))}
         </ol>
-        {r.cluster && (
+        {r?.cluster && (
           <div className="alert alert-info mt"><Users size={18} aria-hidden="true" />
             <div className="small">{t('{n} families in {area} asked for the same thing.', { n: r.cluster.unique_households, area: r.cluster.area })} <strong>“{r.cluster.title}”</strong></div></div>
         )}
         <div className="row mt">
-          <Link className="btn btn-primary btn-lg" to={`/track/${r.tracking_id}`}><Search size={18} aria-hidden="true" />{t('See progress')}</Link>
+          <Link className="btn btn-primary btn-lg" to={`/track/${r?.tracking_id}`}><Search size={18} aria-hidden="true" />{t('See progress')}</Link>
           <button type="button" className="btn btn-lg" onClick={onNew}><HomeIcon size={18} aria-hidden="true" />{t('Report another problem')}</button>
         </div>
       </Card>
 
-      <Card title="What we understood">
-        <Understanding u={r.understanding} />
-        {r.understanding.flags?.length > 0 && <div className="row mt">{r.understanding.flags.map((f) => <Badge key={f} tone="amber">{t(FLAG_WORD[f] || f.replace(/_/g, ' '))}</Badge>)}</div>}
-        <p className="help mt">{t('Names and phone numbers are hidden from officers.')}</p>
-      </Card>
+      {r?.understanding && (
+        <Card title="What we understood">
+          <Understanding u={r.understanding} />
+          {r.understanding.flags?.length > 0 && <div className="row mt">{r.understanding.flags.map((f) => <Badge key={f} tone="amber">{t(FLAG_WORD[f] || f.replace(/_/g, ' '))}</Badge>)}</div>}
+          <p className="help mt">{t('Names and phone numbers are hidden from officers.')}</p>
+        </Card>
+      )}
     </div>
   )
+}
+
+// ==============================================================================
+// GEOGRAPHIC HIERARCHY HELPERS (State -> District -> Mandal -> Village)
+// Supports both flat object maps and nested tree responses from /api/geo/hierarchy
+// ==============================================================================
+
+/** Extract root states mapping from the geo hierarchy response. */
+export function getHierarchyTree(h) {
+  if (!h) return {}
+  return h.states || h
+}
+
+/** Returns list of available state names (defaults to Telangana). */
+export function getStatesList(h) {
+  const tree = getHierarchyTree(h)
+  const keys = Object.keys(tree)
+  return keys.length > 0 ? keys : ['Telangana']
+}
+
+/** Returns districts in the selected state. */
+export function getDistrictsList(h, st) {
+  const tree = getHierarchyTree(h)
+  const dTree = tree[st]?.districts || tree[st] || {}
+  const keys = Object.keys(dTree)
+  return keys.length > 0 ? keys : ['Adilabad', 'Hyderabad']
+}
+
+/** Returns mandals for the selected district and state. */
+export function getMandalsList(h, st, dist) {
+  const tree = getHierarchyTree(h)
+  const dTree = tree[st]?.districts || tree[st] || {}
+  const mTree = dTree[dist]?.mandals || dTree[dist] || {}
+  const keys = Object.keys(mTree)
+  return keys.length > 0 ? keys : ['Utnoor']
+}
+
+/** Returns village/ward names for the selected mandal, district, and state. */
+export function getVillagesList(h, st, dist, mnd) {
+  const tree = getHierarchyTree(h)
+  const dTree = tree[st]?.districts || tree[st] || {}
+  const mTree = dTree[dist]?.mandals || dTree[dist] || {}
+  const rawList = mTree[mnd] || []
+  if (!Array.isArray(rawList) || rawList.length === 0) return ['Birsaidpet']
+  return rawList.map((item) => (typeof item === 'string' ? item : item.village || item.name || ''))
 }
 
 export default function Report() {
@@ -218,49 +265,46 @@ export default function Report() {
   useEffect(() => {
     api.geoHierarchy().then((data) => {
       setHierarchy(data)
-      if (data?.states?.Telangana) {
-        setSelState('Telangana')
-        const dists = Object.keys(data.states.Telangana.districts || {})
-        if (dists.length > 0) {
-          const d = dists[0]
-          setSelDistrict(d)
-          const mnds = Object.keys(data.states.Telangana.districts[d]?.mandals || {})
-          if (mnds.length > 0) {
-            const m = mnds[0]
-            setSelMandal(m)
-            const vills = data.states.Telangana.districts[d]?.mandals[m] || []
-            if (vills.length > 0) setSelVillage(vills[0])
-          }
-        }
-      }
+      const stList = getStatesList(data)
+      const st = stList.includes('Telangana') ? 'Telangana' : stList[0]
+      setSelState(st)
+      const distList = getDistrictsList(data, st)
+      const dist = distList.includes('Adilabad') ? 'Adilabad' : distList[0]
+      setSelDistrict(dist)
+      const mndList = getMandalsList(data, st, dist)
+      const mnd = mndList.includes('Utnoor') ? 'Utnoor' : mndList[0]
+      setSelMandal(mnd)
+      const vList = getVillagesList(data, st, dist, mnd)
+      const v = vList.includes('Birsaidpet') ? 'Birsaidpet' : vList[0]
+      setSelVillage(v)
     }).catch(() => {})
   }, [])
 
   const handleStateChange = (st) => {
     setSelState(st)
-    const dists = Object.keys(hierarchy?.states?.[st]?.districts || {})
-    const d = dists[0] || 'Adilabad'
-    setSelDistrict(d)
-    const mnds = Object.keys(hierarchy?.states?.[st]?.districts?.[d]?.mandals || {})
-    const m = mnds[0] || 'Utnoor'
-    setSelMandal(m)
-    const vills = hierarchy?.states?.[st]?.districts?.[d]?.mandals?.[m] || []
-    setSelVillage(vills[0] || 'Birsaidpet')
+    const distList = getDistrictsList(hierarchy, st)
+    const dist = distList[0] || 'Adilabad'
+    setSelDistrict(dist)
+    const mndList = getMandalsList(hierarchy, st, dist)
+    const mnd = mndList[0] || 'Utnoor'
+    setSelMandal(mnd)
+    const vList = getVillagesList(hierarchy, st, dist, mnd)
+    setSelVillage(vList[0] || 'Birsaidpet')
   }
 
   const handleDistrictChange = (d) => {
     setSelDistrict(d)
-    const mnds = Object.keys(hierarchy?.states?.[selState]?.districts?.[d]?.mandals || {})
-    const m = mnds[0] || ''
-    setSelMandal(m)
-    const vills = hierarchy?.states?.[selState]?.districts?.[d]?.mandals?.[m] || []
-    setSelVillage(vills[0] || '')
+    const mndList = getMandalsList(hierarchy, selState, d)
+    const mnd = mndList[0] || 'Utnoor'
+    setSelMandal(mnd)
+    const vList = getVillagesList(hierarchy, selState, d, mnd)
+    setSelVillage(vList[0] || 'Birsaidpet')
   }
 
   const handleMandalChange = (m) => {
     setSelMandal(m)
-    const vills = hierarchy?.states?.[selState]?.districts?.[selDistrict]?.mandals?.[m] || []
-    setSelVillage(vills[0] || '')
+    const vList = getVillagesList(hierarchy, selState, selDistrict, m)
+    setSelVillage(vList[0] || 'Birsaidpet')
   }
 
   const handleVillageChange = (v) => {
@@ -321,12 +365,17 @@ export default function Report() {
     navigator.geolocation.getCurrentPosition((p) => setCoords({ lat: p.coords.latitude, lng: p.coords.longitude }), () => setCoords(null), { timeout: 8000 })
   }
 
+  /**
+   * Submits citizen grievance with 4-level dependent location (State -> District -> Mandal -> Village),
+   * category problem type, voice or text description, and photo attachments.
+   */
   const submit = async (e) => {
     e.preventDefault()
     setBusy(true); setError(null)
     try {
       const f = new FormData()
       f.append('text', text)
+      // Pass dependent jurisdiction selections
       f.append('state', selState || 'Telangana')
       f.append('district', selDistrict || 'Adilabad')
       f.append('mandal', selMandal || 'Utnoor')
@@ -341,22 +390,28 @@ export default function Report() {
       if (assisted && helper) f.append('assisted_by', helper)
       if (!text && speakLang) f.append('language', speakLang)
       if (audio) f.append('audio', audio, 'voice.webm')
+      // Append photo evidence attachments
       if (photos.length > 0) {
         photos.forEach((p) => f.append('photos', p, p.name))
       } else if (photo) {
         f.append('photos', photo, photo.name)
       }
+      // Submit to cycle intake endpoint (POST /api/cycle/intake)
       const res = await api.cycleIntake(f)
       setResult(res)
       window.scrollTo?.(0, 0)
       try { localStorage.setItem('js_last_tid', res.tracking_id) } catch { /* ignore */ }
     } catch (err) {
-      if (!navigator.onLine || err instanceof TypeError) {
+      // If truly offline, save grievance into local outbox queue to sync when online
+      if (!navigator.onLine) {
         saveOutbox([...outbox, { text, channel: assisted ? 'assisted' : 'web', area_id: areaId ? Number(areaId) : null, lat: coords?.lat, lng: coords?.lng,
           phone: phone || null, anonymous, gender, assisted_by: assisted ? helper : null }])
         setOfflineMsg({ key: 'No internet. Saved on this phone. It will be sent when you are online.' })
         setText(''); setPicked(null)
-      } else setError(err)
+      } else {
+        // Display real server / network error clearly in UI
+        setError(err)
+      }
     } finally { setBusy(false) }
   }
 
@@ -432,48 +487,33 @@ export default function Report() {
                 <div className="field">
                   <label htmlFor="sel-state">{t('State')}</label>
                   <select id="sel-state" className="select" value={selState} onChange={(e) => handleStateChange(e.target.value)} style={{ minHeight: 46 }}>
-                    {hierarchy ? Object.keys(hierarchy.states || {}).map((s) => (
+                    {getStatesList(hierarchy).map((s) => (
                       <option key={s} value={s}>{t(s)}</option>
-                    )) : <option value="Telangana">{t('Telangana')}</option>}
+                    ))}
                   </select>
                 </div>
                 <div className="field">
                   <label htmlFor="sel-dist">{t('District')}</label>
                   <select id="sel-dist" className="select" value={selDistrict} onChange={(e) => handleDistrictChange(e.target.value)} style={{ minHeight: 46 }}>
-                    {hierarchy && hierarchy.states?.[selState] ? (
-                      Object.keys(hierarchy.states[selState].districts || {}).map((d) => (
-                        <option key={d} value={d}>{t(d)}</option>
-                      ))
-                    ) : (
-                      <>
-                        <option value="Adilabad">{t('Adilabad')}</option>
-                        <option value="Hyderabad">{t('Hyderabad')}</option>
-                      </>
-                    )}
+                    {getDistrictsList(hierarchy, selState).map((d) => (
+                      <option key={d} value={d}>{t(d)}</option>
+                    ))}
                   </select>
                 </div>
                 <div className="field">
                   <label htmlFor="sel-mandal">{t('Mandal')}</label>
                   <select id="sel-mandal" className="select" value={selMandal} onChange={(e) => handleMandalChange(e.target.value)} style={{ minHeight: 46 }}>
-                    {hierarchy && hierarchy.states?.[selState]?.districts?.[selDistrict] ? (
-                      Object.keys(hierarchy.states[selState].districts[selDistrict].mandals || {}).map((m) => (
-                        <option key={m} value={m}>{m} {t('mandal')}</option>
-                      ))
-                    ) : (
-                      <option value="Utnoor">Utnoor {t('mandal')}</option>
-                    )}
+                    {getMandalsList(hierarchy, selState, selDistrict).map((m) => (
+                      <option key={m} value={m}>{m} {t('mandal')}</option>
+                    ))}
                   </select>
                 </div>
                 <div className="field">
                   <label htmlFor="sel-village">{t('Village / Ward')}</label>
                   <select id="sel-village" className="select" value={selVillage} onChange={(e) => handleVillageChange(e.target.value)} style={{ minHeight: 46 }}>
-                    {hierarchy && hierarchy.states?.[selState]?.districts?.[selDistrict]?.mandals?.[selMandal] ? (
-                      (hierarchy.states[selState].districts[selDistrict].mandals[selMandal] || []).map((v) => (
-                        <option key={v} value={v}>{v}</option>
-                      ))
-                    ) : (
-                      <option value="Birsaidpet">Birsaidpet</option>
-                    )}
+                    {getVillagesList(hierarchy, selState, selDistrict, selMandal).map((v) => (
+                      <option key={v} value={v}>{v}</option>
+                    ))}
                   </select>
                 </div>
               </div>

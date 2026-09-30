@@ -1270,7 +1270,7 @@ def issue_show_cause_notice(
 @router.patch("/district/show-cause/{id}")
 def respond_or_close_show_cause(
     id: int,
-    action: str = Query(..., regex="^(answer|accept|refer)$"),
+    action: str = Query(..., pattern="^(answer|accept|refer)$"),
     body: Optional[Dict[str, Any]] = None,
     claims: dict = Depends(security.require_officer),
     db: Session = Depends(get_db),

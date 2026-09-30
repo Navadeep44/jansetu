@@ -182,7 +182,11 @@ async def cycle_intake(
     return {
         "status": "success",
         "tracking_id": req.tracking_id,
+        "reply": res.get("reply", f"Grievance submitted successfully. Your tracking ID is {req.tracking_id}."),
+        "reply_kind": res.get("reply_kind", "ack"),
         "request": request_out(req, full=True),
+        "cluster": cluster_out(res["cluster"]) if res.get("cluster") else None,
+        "understanding": res.get("understanding", {}),
         "message": f"Grievance submitted successfully. Your tracking ID is {req.tracking_id}.",
     }
 
@@ -193,7 +197,7 @@ async def cycle_intake(
 @router.post("/requests/{req_id}/verify-head")
 def department_head_verify(
     req_id: int,
-    action: str = Form(..., regex="^(verify|reject)$"),
+    action: str = Form(..., pattern="^(verify|reject)$"),
     rejection_reason: Optional[str] = Form(None),
     claims: dict = Depends(security.require_officer),
     db: Session = Depends(get_db),
@@ -460,7 +464,7 @@ async def field_officer_inspect_and_budget(
 def forward_to_collector(
     req_id: int,
     forward_note: str = Form(...),
-    action: str = Form("forward", regex="^(forward|rework)$"),
+    action: str = Form("forward", pattern="^(forward|rework)$"),
     rework_note: Optional[str] = Form(None),
     claims: dict = Depends(security.require_officer),
     db: Session = Depends(get_db),

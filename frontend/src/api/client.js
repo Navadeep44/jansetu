@@ -1,5 +1,9 @@
-// Thin API client. VITE_API_URL lets the frontend talk to a remote node; defaults to http://127.0.0.1:8000 in local dev or same origin.
-const BASE = import.meta.env.VITE_API_URL || (typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') ? 'http://127.0.0.1:8000' : '')
+// Thin API client. VITE_API_URL lets the frontend talk to a remote node; defaults to port 8000 when on Vite dev server (5173), or same origin in production.
+const BASE = import.meta.env.VITE_API_URL || (
+  typeof window !== 'undefined' && window.location.port === '5173'
+    ? `http://${window.location.hostname}:8000`
+    : ''
+)
 
 let authToken = null
 let onUnauthorised = () => {}
