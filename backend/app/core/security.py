@@ -65,7 +65,7 @@ ROLE_PERMISSIONS: dict[str, Set[str]] = {
     ROLE_SUPER_ADMIN: {"*"},
     ROLE_ADMIN: {
         "dashboard:view", "priorities:view", "clusters:view", "projects:view",
-        "projects:fund", "projects:reject", "projects:optimize", "brics:view",
+        "projects:fund", "projects:reject", "projects:optimize",
         "brief:generate_national", "brief:generate", "officers:view", "officers:manage_state",
         "budget:view_national", "budget:view", "audit:view", "users:view"
     },
@@ -913,3 +913,35 @@ def login(username: str, password: str) -> dict:
         db.close()
 
 
+
+
+# ---------------------------------------------------------------------------
+# Jurisdiction for read-only analytics (dashboards, maps, rankings, briefs).
+# National / super admins may look anywhere; everyone else is locked to their own state /
+# district / department, whatever filter the browser sends.
+# ---------------------------------------------------------------------------
+NATIONWIDE_ROLES = {ROLE_SUPER_ADMIN, ROLE_ADMIN, "national", "admin"}
+
+
+def effective_scope(claims: dict, state: Optional[str] = None, district: Optional[str] = None,
+                    department: Optional[str] = None) -> dict:
+    role = (claims or {}).get("r") or ROLE_CITIZEN
+    if role in NATIONWIDE_ROLES or role == ROLE_CITIZEN:
+        # citizens only reach public, aggregated data; admins see all of India
+        return {"state": state or None, "district": district or None, "department": department or None, "locked": False}
+    return {
+        "state": claims.get("st") or state or None,
+        "district": claims.get("dist") or (district if claims.get("st") else None) or None,
+        "department": claims.get("dept") if role in (ROLE_DEPT_OFFICER, ROLE_FIELD_OFFICER) else (department or None),
+        "locked": True,
+    }
+
+
+def row_in_scope(row: dict, scope: dict, sector_key: str = "sector") -> bool:
+    if scope.get("state") and row.get("state") != scope["state"]:
+        return False
+    if scope.get("district") and row.get("district") != scope["district"]:
+        return False
+    if scope.get("department") and row.get(sector_key) and row.get(sector_key) != scope["department"]:
+        return False
+    return True

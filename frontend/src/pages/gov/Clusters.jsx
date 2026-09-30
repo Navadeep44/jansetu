@@ -1,11 +1,13 @@
 import { useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
-import { ArrowLeft } from 'lucide-react'
+import { ArrowLeft, HandCoins } from 'lucide-react'
 import { api } from '../../api/client'
 import { useApp } from '../../context/AppContext'
 import { useT } from '../../i18n'
 import { useAsync } from '../../lib/useAsync'
+import { can, jurisdictionText } from '../../lib/roles'
+import { ProposeWork } from '../../components/officer/shared'
 import { Badge, Card, ErrorBox, Loading, PageHead, SectorTag, Stat, StatusBadge } from '../../components/ui'
 import { CHANNEL_LABEL, LANG_NAMES, SECTORS, SECTOR_KEYS, date, fmt, money } from '../../lib/format'
 
@@ -13,30 +15,36 @@ const GROUP = { children: 'Children', women: 'Women', pregnant_women: 'Pregnant 
 const GENDER = { male: 'Men', female: 'Women', undisclosed: 'Not said', other: 'Other' }
 
 export function ClusterList() {
-  const { stateParam } = useApp()
+  const { stateParam, stateLocked, user, role } = useApp()
   const t = useT()
+  const isDept = role === 'dept_officer'
+  const canPropose = can(role, 'propose')
   const [sector, setSector] = useState('all')
   const [sort, setSort] = useState('households')
-  const { data, loading, error } = useAsync(() => api.clusters({ state: stateParam, category: sector, sort, limit: 60 }), [stateParam, sector, sort])
+  const { data, loading, error } = useAsync(() => // Locked officers are already scoped by the backend; sending state again makes it join twice (500).
+    api.clusters({ state: stateLocked ? undefined : stateParam, category: isDept ? undefined : sector, sort, limit: 60 }), [stateParam, stateLocked, isDept, sector, sort])
   return (
     <div className="stack-md">
-      <PageHead title="Grouped needs" eyebrow="Official workspace" steps={['One card = one problem in one place', 'Sort by families, how serious, or date', 'Open a card to read what people said']}>
+      <PageHead title="Grouped needs" eyebrow={<>{jurisdictionText(user, t)}</>} steps={['One card = one problem in one place', 'Sort by families, how serious, or date', 'Open a card to read what people said']}>
         Same problem, same place = one need. We count families, not messages.
       </PageHead>
       <div className="card row">
-        <label className="row small"><span className="muted">{t('Type of need')}</span>
+        {!isDept && <label className="row small"><span className="muted">{t('Type of need')}</span>
           <select className="select" style={{ width: 'auto', minHeight: 44 }} value={sector} onChange={(e) => setSector(e.target.value)}>
-            <option value="all">{t('All needs')}</option>{SECTOR_KEYS.map((s) => <option key={s} value={s}>{t(SECTORS[s].label)}</option>)}</select></label>
+            <option value="all">{t('All needs')}</option>{SECTOR_KEYS.map((s) => <option key={s} value={s}>{t(SECTORS[s].label)}</option>)}</select></label>}
         <label className="row small"><span className="muted">{t('Sort')}</span>
           <select className="select" style={{ width: 'auto', minHeight: 44 }} value={sort} onChange={(e) => setSort(e.target.value)}>
             <option value="households">{t('Most families')}</option><option value="severity">{t('Most serious')}</option><option value="recent">{t('Newest')}</option></select></label>
         {data && <span className="small muted">{t('{n} grouped needs', { n: fmt(data.total) })}</span>}
+        {!canPropose && <Link to="/projects" className="btn btn-sm" style={{ marginLeft: 'auto' }}><HandCoins size={14} aria-hidden="true" />{t('See projects')}</Link>}
       </div>
+      {canPropose && <div className="alert alert-info small">{t('See a big need? Press “Propose a work”. The District Collector decides.')}</div>}
       <ErrorBox error={error} />
-      {loading ? <Loading height={400} /> : (
+      {loading ? <Loading height={400} /> : data && (
         <div className="grid g-3">
           {data.items.map((c) => (
-            <Link key={c.id} to={`/clusters/${c.id}`} className="card role-card">
+            <div key={c.id} className="card role-card stack" style={{ gap: 8 }}>
+              <Link to={`/clusters/${c.id}`} className="stack" style={{ gap: 8, color: 'inherit', textDecoration: 'none' }}>
               <div className="row-between"><SectorTag sector={c.category} short /><StatusBadge status={c.status} /></div>
               <h3>{c.title}</h3>
               <div className="row small"><span className="mono"><strong>{fmt(c.unique_households)}</strong> {t('families')}</span><span className="muted">· {t('{n} reports', { n: fmt(c.request_count) })}</span></div>
@@ -45,8 +53,10 @@ export function ClusterList() {
                 {c.vulnerable_groups.slice(0, 2).map((g) => <Badge key={g} tone="violet">{t(GROUP[g] || g.replace(/_/g, ' '))}</Badge>)}
                 {c.campaign_share > 0.2 && <Badge tone="amber">{t('Copy-paste {p}%', { p: Math.round(c.campaign_share * 100) })}</Badge>}
               </div>
-              <div className="xs muted">{t(c.district)}, {t(c.state)} · {t('How serious')}: {c.severity_avg}/5 · {t('Last report')}: {date(c.last_seen)}</div>
-            </Link>
+              <div className="xs muted">{c.area} · {t(c.district)}, {t(c.state)} · {t('How serious')}: {c.severity_avg}/5 · {t('Last report')}: {date(c.last_seen)}</div>
+              </Link>
+              {canPropose && c.status === 'open' && <div style={{ marginTop: 'auto' }}><ProposeWork cluster={c} /></div>}
+            </div>
           ))}
         </div>
       )}
@@ -57,6 +67,8 @@ export function ClusterList() {
 export function ClusterDetail() {
   const { id } = useParams()
   const t = useT()
+  const { role } = useApp()
+  const canPropose = can(role, 'propose')
   const { data, loading, error } = useAsync(() => api.cluster(id), [id])
   if (loading) return <Loading height={400} />
   if (error) return <ErrorBox error={error} />
@@ -66,6 +78,7 @@ export function ClusterDetail() {
       <PageHead title={<>{c.title}</>} eyebrow="Official workspace" actions={<Link to="/clusters" className="btn"><ArrowLeft size={16} aria-hidden="true" />{t('All grouped needs')}</Link>}>
         {<>{t('{h} families asked for this in {n} reports.', { h: fmt(c.unique_households), n: fmt(c.request_count) })}</>}
       </PageHead>
+      {canPropose && c.status === 'open' && <div className="card"><ProposeWork cluster={c} /></div>}
       <div className="grid g-4">
         <Stat tone="blue" label="Families" value={fmt(c.unique_households)} />
         <Stat tone="blue" label="Reports" value={fmt(c.request_count)} />

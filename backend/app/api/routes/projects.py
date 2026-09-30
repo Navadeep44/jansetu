@@ -19,7 +19,7 @@ TRANSITIONS = {"approve": "approved", "defer": "deferred", "reject": "rejected",
 
 
 @router.get("")
-def list_projects(source: str | None = None, country: str | None = None, state: str | None = None, status: str | None = None, sector: str | None = None,
+def list_projects(source: str | None = None, country: str | None = None, state: str | None = None, district: str | None = None, status: str | None = None, sector: str | None = None,
                   limit: int = 100, claims: dict = Depends(security.get_current_user_claims), db: Session = Depends(get_db)):
     q = db.query(Project)
     
@@ -28,8 +28,14 @@ def list_projects(source: str | None = None, country: str | None = None, state: 
 
     if source:
         q = q.filter(Project.source == source)
-    if state:
-        q = q.join(Area, Project.area_id == Area.id).filter(Area.state == state)
+    already_joined = bool((claims.get("st") or claims.get("dist")) and claims.get("r") not in security.NATIONWIDE_ROLES)
+    if state or district:
+        if not already_joined:
+            q = q.join(Area, Project.area_id == Area.id)
+        if state:
+            q = q.filter(Area.state == state)
+        if district:
+            q = q.filter(Area.district == district)
     if status:
         q = q.filter(Project.status.in_(status.split(",")))
     if sector:
@@ -59,16 +65,23 @@ def regenerate(min_ngi: float = 40.0, role: str = Depends(require(*PLANNER_ROLES
     return {"created": n}
 
 
+DECIDERS = {security.ROLE_SUPER_ADMIN, security.ROLE_ADMIN, security.ROLE_STATE_OFFICER, security.ROLE_DISTRICT_OFFICER}
+
+
 @router.post("/{project_id}/decision")
-def decide(project_id: int, body: DecisionIn, role: str = Depends(require(*PLANNER_ROLES)), db: Session = Depends(get_db)):
+def decide(project_id: int, body: DecisionIn, claims: dict = Depends(security.require_officer), db: Session = Depends(get_db)):
+    role = claims.get("r")
+    if security.normalize_role(role) not in DECIDERS and role != security.ROLE_SUPER_ADMIN:
+        raise HTTPException(403, "Only the District Collector, the State or the national planners can decide on projects.")
     p = db.get(Project, project_id)
     if not p:
         raise HTTPException(404)
+    security.verify_resource_in_scope(claims, p, db)  # a Collector can only decide projects in their own district
     if body.decision not in TRANSITIONS:
         raise HTTPException(400, f"decision must be one of {list(TRANSITIONS)}")
     if body.decision in ("reject", "defer") and len(body.reason.strip()) < 5:
         raise HTTPException(422, "A reason is required to reject or defer an AI recommendation (accountability).")
-    p.status, p.decision_reason, p.decided_by = TRANSITIONS[body.decision], body.reason, role
+    p.status, p.decision_reason, p.decided_by = TRANSITIONS[body.decision], body.reason, f"{role}:{claims.get('u')}"
     now = datetime.utcnow()
     if body.decision == "start":
         p.started_at = now
@@ -100,10 +113,11 @@ def decide(project_id: int, body: DecisionIn, role: str = Depends(require(*PLANN
 
 
 @router.post("/optimise")
-def optimise(body: OptimiseIn, db: Session = Depends(get_db)):
+def optimise(body: OptimiseIn, claims: dict = Depends(security.require_officer), db: Session = Depends(get_db)):
     statuses = ["recommended", "approved"] if body.include_approved else ["recommended"]
     q = db.query(Project).filter(Project.source == "recommended", Project.status.in_(statuses))
-    if body.state:
+    q = security.apply_jurisdiction_scope(q, claims, Project, db)
+    if body.state and not claims.get("st"):
         q = q.join(Area, Project.area_id == Area.id).filter(Area.state == body.state)
     cands = q.all()
     res = recommender.optimise(cands, body.budget)

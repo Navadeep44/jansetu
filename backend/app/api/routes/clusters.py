@@ -25,8 +25,10 @@ def list_clusters(country: str | None = None, state: str | None = None, district
 
     if country:
         q = q.filter(DemandCluster.country_code == country)
+    already_joined = bool((claims.get("st") or claims.get("dist")) and claims.get("r") not in security.NATIONWIDE_ROLES)
     if state or district:
-        q = q.join(Area, DemandCluster.area_id == Area.id)
+        if not already_joined:
+            q = q.join(Area, DemandCluster.area_id == Area.id)
         if state:
             q = q.filter(Area.state == state)
         if district:

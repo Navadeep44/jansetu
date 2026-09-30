@@ -20,7 +20,8 @@ ALERT_TEXT = {
 }
 
 
-def weekly_series(db: Session, weeks: int = 12, country: str | None = None, sector: str | None = None, state: str | None = None) -> list[dict]:
+def weekly_series(db: Session, weeks: int = 12, country: str | None = None, sector: str | None = None, state: str | None = None,
+                  district: str | None = None) -> list[dict]:
     now = datetime.utcnow()
     since = now - timedelta(weeks=weeks)
     q = db.query(CitizenRequest).filter(CitizenRequest.created_at >= since)
@@ -28,8 +29,12 @@ def weekly_series(db: Session, weeks: int = 12, country: str | None = None, sect
         q = q.filter(CitizenRequest.country_code == country)
     if sector and sector != "all":
         q = q.filter(CitizenRequest.category == sector)
-    if state:
-        q = q.join(Area, CitizenRequest.area_id == Area.id).filter(Area.state == state)
+    if state or district:
+        q = q.join(Area, CitizenRequest.area_id == Area.id)
+        if state:
+            q = q.filter(Area.state == state)
+        if district:
+            q = q.filter(Area.district == district)
     buckets = defaultdict(lambda: defaultdict(int))
     for r in q.all():
         wk = (now - r.created_at).days // 7

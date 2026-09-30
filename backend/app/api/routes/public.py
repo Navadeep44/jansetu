@@ -37,6 +37,16 @@ def my_requests(phone: str, db: Session = Depends(get_db)):
     return [request_out(r) for r in rows]
 
 
+@router.get("/citizen/me/requests")
+def my_requests_logged_in(claims: dict = Depends(security.get_current_user_claims), db: Session = Depends(get_db)):
+    """Requests of the logged-in citizen (phone + one-time code login)."""
+    from app.models.user import User
+    u = db.get(User, claims.get("sub") or 0)
+    if not u or not u.phone:
+        raise HTTPException(401, "Please log in with your phone number.")
+    return my_requests(u.phone, db)
+
+
 @router.get("/nearby")
 def nearby(area_id: int | None = None, lat: float | None = None, lng: float | None = None, db: Session = Depends(get_db)):
     """Needs already reported near the citizen, so they can add their voice with one tap."""

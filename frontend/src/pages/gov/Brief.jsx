@@ -1,7 +1,7 @@
 import { useSearchParams } from 'react-router-dom'
 import { Printer } from 'lucide-react'
 import { api } from '../../api/client'
-import { useApp } from '../../context/AppContext'
+import { AreaLine, useLevel } from './levelScope'
 import { useT } from '../../i18n'
 import { useAsync } from '../../lib/useAsync'
 import { Card, ErrorBox, ListenButton, Loading, NgiBar, PageHead, SectorTag } from '../../components/ui'
@@ -9,10 +9,14 @@ import { DISTRICTS, SECTORS, STATES, date, fmt, money, pct } from '../../lib/for
 
 export default function Brief() {
   const t = useT()
-  const { uiLang, stateParam } = useApp()
+  const { level, uiLang, state: stateParam, district: fixedDistrict } = useLevel()
   const [sp, setSp] = useSearchParams()
-  const state = sp.get('state') ?? stateParam ?? ''
-  const district = sp.get('district') || ''
+  // National planners pick any state; a State officer's state is fixed; a Collector's district is fixed.
+  const state = level === 'nation' ? sp.get('state') ?? stateParam ?? '' : stateParam || ''
+  const askedDistrict = sp.get('district') || ''
+  const district = fixedDistrict || ((DISTRICTS[state] || []).includes(askedDistrict) ? askedDistrict : '')
+  const steps = level === 'nation' ? ['Pick a state and district', 'Read or listen', 'Print or save as PDF']
+    : level === 'state' ? ['Pick a district or the whole state', 'Read or listen', 'Print or save as PDF'] : ['Read or listen', 'Print or save as PDF']
   const { data: b, loading, error } = useAsync(() => api.brief({ state: state || undefined, district: district || undefined, language: uiLang }), [state, district, uiLang])
   const place = district ? `${t(district)}, ${t(state)}` : state ? t(state) : t('All India')
   const lowMoney = b ? b.misaligned_spending.reduce((s, m) => s + (m.cost_local || 0), 0) : 0
@@ -26,18 +30,19 @@ export default function Brief() {
   return (
     <div className="stack-md">
       <div className="no-print">
-        <PageHead title="Policy brief" eyebrow="Official workspace" overlap={false} steps={['Pick a state and district', 'Read or listen', 'Print or save as PDF']}>
+        <PageHead title="Policy brief" eyebrow="Official workspace" overlap={false} steps={steps}>
           A short, printable summary for decision makers.
         </PageHead>
       </div>
       <div className="stack-md" style={{ maxWidth: 980 }}>
       <div className="card row no-print">
-        <label className="row small"><span className="muted">{t('State')}</span>
+        {level === 'nation' && <label className="row small"><span className="muted">{t('State')}</span>
           <select className="select" style={{ width: 'auto', minHeight: 44 }} value={state} onChange={(e) => setSp(e.target.value ? { state: e.target.value } : {})}>
-            <option value="">{t('All India')}</option>{STATES.map((s) => <option key={s} value={s}>{t(s)}</option>)}</select></label>
-        <label className="row small"><span className="muted">{t('District')}</span>
-          <select className="select" style={{ width: 'auto', minHeight: 44 }} value={district} disabled={!state} onChange={(e) => setSp(e.target.value ? { state, district: e.target.value } : { state })}>
-            <option value="">{t('Whole state')}</option>{(DISTRICTS[state] || []).map((d) => <option key={d} value={d}>{t(d)}</option>)}</select></label>
+            <option value="">{t('All India')}</option>{STATES.map((s) => <option key={s} value={s}>{t(s)}</option>)}</select></label>}
+        {(level === 'nation' || level === 'state') && <label className="row small"><span className="muted">{t('District')}</span>
+          <select className="select" style={{ width: 'auto', minHeight: 44 }} value={district} disabled={!state} onChange={(e) => setSp(e.target.value ? (level === 'nation' ? { state, district: e.target.value } : { district: e.target.value }) : (level === 'nation' ? { state } : {}))}>
+            <option value="">{t('Whole state')}</option>{(DISTRICTS[state] || []).map((d) => <option key={d} value={d}>{t(d)}</option>)}</select></label>}
+        {level === 'district' && <AreaLine place={place} />}
         <button className="btn btn-primary" onClick={() => window.print()}><Printer size={16} aria-hidden="true" />{t('Print / save as PDF')}</button>
         {findings.length > 0 && <ListenButton text={`${t('Development needs brief: {p}', { p: place })}. ${findings.join(' ')}`} className="btn" />}
       </div>

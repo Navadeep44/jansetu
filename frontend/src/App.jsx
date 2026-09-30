@@ -21,6 +21,7 @@ const Ask = lazy(() => import('./pages/gov/Ask'))
 const Brief = lazy(() => import('./pages/gov/Brief'))
 const Impact = lazy(() => import('./pages/gov/Impact'))
 const Trust = lazy(() => import('./pages/trust/Trust'))
+const UserManagement = lazy(() => import('./pages/admin/UserManagement'))
 const Audit = lazy(() => import('./pages/trust/Trust').then((m) => ({ default: m.Audit })))
 
 export default function App() {
@@ -36,17 +37,18 @@ export default function App() {
           <Route path="channels" element={<Channels />} />
           <Route path="results" element={<Results />} />
           <Route path="login" element={<Login />} />
-          <Route path="officer" element={<RequireOfficial><Officer /></RequireOfficial>} />
-          <Route path="dashboard" element={<RequireOfficial><Dashboard /></RequireOfficial>} />
-          <Route path="clusters" element={<RequireOfficial><ClusterList /></RequireOfficial>} />
-          <Route path="clusters/:id" element={<RequireOfficial><ClusterDetail /></RequireOfficial>} />
-          <Route path="priorities" element={<RequireOfficial><Priorities /></RequireOfficial>} />
-          <Route path="projects" element={<RequireOfficial><Projects /></RequireOfficial>} />
-          <Route path="ask" element={<RequireOfficial><Ask /></RequireOfficial>} />
-          <Route path="brief" element={<RequireOfficial><Brief /></RequireOfficial>} />
-          <Route path="impact" element={<RequireOfficial><Impact /></RequireOfficial>} />
+          <Route path="officer" element={<RequireOfficial page="officer"><Officer /></RequireOfficial>} />
+          <Route path="dashboard" element={<RequireOfficial page="dashboard"><Dashboard /></RequireOfficial>} />
+          <Route path="clusters" element={<RequireOfficial page="clusters"><ClusterList /></RequireOfficial>} />
+          <Route path="clusters/:id" element={<RequireOfficial page="clusters"><ClusterDetail /></RequireOfficial>} />
+          <Route path="priorities" element={<RequireOfficial page="priorities"><Priorities /></RequireOfficial>} />
+          <Route path="projects" element={<RequireOfficial page="projects"><Projects /></RequireOfficial>} />
+          <Route path="ask" element={<RequireOfficial page="ask"><Ask /></RequireOfficial>} />
+          <Route path="brief" element={<RequireOfficial page="brief"><Brief /></RequireOfficial>} />
+          <Route path="impact" element={<RequireOfficial page="impact"><Impact /></RequireOfficial>} />
           <Route path="trust" element={<Trust />} />
-          <Route path="audit" element={<RequireOfficial><Audit /></RequireOfficial>} />
+          <Route path="audit" element={<RequireOfficial page="audit"><Audit /></RequireOfficial>} />
+          <Route path="admin/users" element={<RequireOfficial page="users"><UserManagement /></RequireOfficial>} />
           <Route path="*" element={<div className="empty">Page not found.</div>} />
         </Route>
       </Routes>

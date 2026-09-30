@@ -5,6 +5,7 @@ import { useT } from '../../i18n'
 import { useAsync } from '../../lib/useAsync'
 import { Badge, Card, Empty, Loading, PageHead } from '../../components/ui'
 import { date } from '../../lib/format'
+import { AreaLine, placeName, useLevel } from '../gov/levelScope'
 
 // Simple promises to every citizen (India: DPDP Act 2023 + DPDP Rules 2025).
 const PROMISES = [
@@ -28,22 +29,41 @@ const DPG = [
   ['9. Do no harm', 'Urgent cases go to people fast. Abuse is filtered. Every decision is logged.'],
 ]
 
-const ROLE = { field_officer: 'Field officer', district: 'District collector', state: 'State planning officer', national: 'National planner', admin: 'Admin' }
+const ROLE = { field_officer: 'Field officer', district: 'District collector', state: 'State planning officer', national: 'National planner', admin: 'Admin',
+  district_officer: 'District collector', state_officer: 'State planning officer', dept_officer: 'Department officer', super_admin: 'Super admin', citizen: 'Citizen' }
 const ACTION = {
   approve_project: 'Approved a project', reject_project: 'Rejected a project', defer_project: 'Put a project on hold',
   review_request: 'Checked a report', close_request: 'Closed a report', force_close: 'Closed without citizen check',
   regenerate_projects: 'Made new project list', optimise_budget: 'Ran the budget planner',
+  project_approve: 'Approved a project', project_reject: 'Rejected a project', project_defer: 'Put a project on hold',
+  project_start: 'Started work on a project', project_complete: 'Marked a project done', propose_project: 'Proposed a project',
+  regenerate_recommendations: 'Made new project list', assign_field_officer: 'Gave a case to a field officer',
 }
-const ENTITY = { project: 'Project', request: 'Citizen report', cluster: 'Grouped need' }
+const ENTITY = { project: 'Project', request: 'Citizen report', cluster: 'Grouped need', user: 'User account' }
+
+// Officers of a state or district see only decisions about projects and reports in their own area.
+async function loadAudit(scoped) {
+  const log = await api.auditLog()
+  if (!scoped) return log
+  const [projects, reqs] = await Promise.all([
+    api.projects({ limit: 5000 }),
+    log.some((a) => a.entity === 'request') ? api.requests({ limit: 5000 }) : Promise.resolve({ items: [] }),
+  ])
+  const ids = new Set([...(projects || []).map((p) => p.code), ...(reqs?.items || []).map((r) => r.tracking_id)])
+  return log.filter((a) => (a.entity === 'project' || a.entity === 'request') && ids.has(a.entity_id))
+}
 
 export function Audit() {
   const t = useT()
-  const { data, loading } = useAsync(() => api.auditLog(), [])
+  const { scoped, state, district } = useLevel()
+  const place = placeName(t, { state, district })
+  const { data, loading } = useAsync(() => loadAudit(scoped), [scoped])
   return (
     <div className="stack-md">
       <PageHead title="Decision log" eyebrow="Official workspace" steps={['Every decision is saved', 'See who decided and why']}>
-        Every decision by an official, with who and why.
+        {scoped ? <>{t('Every decision about {p}, with who and why.', { p: place })}</> : 'Every decision by an official, with who and why.'}
       </PageHead>
+      <AreaLine place={place} />
       <Card>
         {loading ? <Loading /> : !data?.length ? <Empty /> : (
           <div className="table-wrap"><table className="table">

@@ -1,5 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react'
 import { api, setOnUnauthorised, setToken } from '../api/client'
+import { normRole, roleInfo } from '../lib/roles'
 
 const Ctx = createContext(null)
 
@@ -41,16 +42,25 @@ export function AppProvider({ children }) {
     return s2
   }, [])
 
-  const role = session?.user?.role || 'guest'
+  const role = normRole(session?.user?.role) || 'guest'
+  const user = session?.user || null
+  const isOfficial = !!session?.token && role !== 'citizen' && !!roleInfo(role)
+  // Officers are locked to their own jurisdiction; only national planners / super admin can pick a state.
+  const lockedState = isOfficial ? (user?.state || null) : null
+  const effState = lockedState || stateName
+  const stateParam = effState === 'all' ? undefined : effState
   const value = useMemo(() => ({
-    user: session?.user || null, role, login, logout, sendCitizenCode, loginCitizen,
-    isOfficial: !!session?.token && role !== 'citizen', isCitizen: !!session?.token && role === 'citizen',
+    user, role, roleInfo: roleInfo(role), login, logout, sendCitizenCode, loginCitizen,
+    isOfficial, isCitizen: !!session?.token && role === 'citizen',
     citizenPhone: role === 'citizen' ? session?.phone : null,
-    stateName, setStateName, stateParam: stateName === 'all' ? undefined : stateName,
+    // jurisdiction
+    scope: { state: user?.state || null, district: user?.district || null, block: user?.block || null, department: user?.department || null },
+    stateLocked: !!lockedState, districtParam: isOfficial ? (user?.district || undefined) : undefined,
+    stateName: effState, setStateName, stateParam,
     // legacy aliases: older pages pass `countryParam`; it now carries the selected state
-    country: stateName, setCountry: setStateName, countryParam: stateName === 'all' ? undefined : stateName,
+    country: effState, setCountry: setStateName, countryParam: stateParam,
     uiLang, setUiLang, langChosen, meta,
-  }), [session, role, login, logout, sendCitizenCode, loginCitizen, stateName, uiLang, langChosen, meta, setUiLang])
+  }), [session, user, role, isOfficial, lockedState, effState, stateParam, login, logout, sendCitizenCode, loginCitizen, uiLang, langChosen, meta, setUiLang])
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>
 }
 

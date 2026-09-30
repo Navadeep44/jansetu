@@ -5,6 +5,7 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
+from app.core.security import effective_scope, get_current_user_claims, row_in_scope
 from app.models import Area, CitizenRequest, DemandCluster, Project
 from app.services import analytics_cache, scoring, trends
 
@@ -17,11 +18,21 @@ def _weights(demand: float | None, deficit: float | None, vulnerability: float |
 
 
 @router.get("/overview")
-def overview(state: str | None = None, country: str | None = None, db: Session = Depends(get_db)):
+def overview(state: str | None = None, district: str | None = None, country: str | None = None,
+             claims: dict = Depends(get_current_user_claims), db: Session = Depends(get_db)):
+    sc = effective_scope(claims, state, district)
+    state, district, dept = sc["state"], sc["district"], sc["department"]
+
     def build():
         q = db.query(CitizenRequest)
-        if state:
-            q = q.join(Area, CitizenRequest.area_id == Area.id).filter(Area.state == state)
+        if state or district:
+            q = q.join(Area, CitizenRequest.area_id == Area.id)
+            if state:
+                q = q.filter(Area.state == state)
+            if district:
+                q = q.filter(Area.district == district)
+        if dept:
+            q = q.filter(CitizenRequest.category == dept)
         total = q.count()
         hh = q.with_entities(func.count(func.distinct(CitizenRequest.household_hash))).scalar()
         langs = q.with_entities(func.count(func.distinct(CitizenRequest.language))).scalar()
@@ -30,10 +41,16 @@ def overview(state: str | None = None, country: str | None = None, db: Session =
         cat = dict(q.with_entities(CitizenRequest.category, func.count()).group_by(CitizenRequest.category).all())
         cq = db.query(DemandCluster)
         pq = db.query(Project).filter(Project.source == "recommended")
-        if state:
-            cq = cq.join(Area, DemandCluster.area_id == Area.id).filter(Area.state == state)
-            pq = pq.join(Area, Project.area_id == Area.id).filter(Area.state == state)
-        silent = scoring.silent_zones(db, state=state)
+        if state or district:
+            cq = cq.join(Area, DemandCluster.area_id == Area.id)
+            pq = pq.join(Area, Project.area_id == Area.id)
+            if state:
+                cq, pq = cq.filter(Area.state == state), pq.filter(Area.state == state)
+            if district:
+                cq, pq = cq.filter(Area.district == district), pq.filter(Area.district == district)
+        if dept:
+            cq, pq = cq.filter(DemandCluster.category == dept), pq.filter(Project.sector == dept)
+        silent = [r for r in scoring.silent_zones(db, state=state) if row_in_scope(r, sc)]
         al = scoring.alignment(db, state=state)
         nat = scoring.alignment(db, national=True).get("India", {})
         return {
@@ -48,59 +65,95 @@ def overview(state: str | None = None, country: str | None = None, db: Session =
                                    "share_to_below_median_need": nat.get("share_to_below_median_need", 0)},
             "states": len({a.state for a in db.query(Area).all()}),
             "districts": len({(a.state, a.district) for a in db.query(Area).all()}),
-            "alerts": len(trends.alerts(db, state=state)),
+            "alerts": len([a for a in trends.alerts(db, state=state) if row_in_scope(a, sc)]),
             "needs_review": st.get("needs_review", 0),
+            "scope": sc,
         }
-    return analytics_cache.cached(("overview", state), build)
+    return analytics_cache.cached(("overview", state, district, dept), build)
 
 
 @router.get("/states")
-def states(db: Session = Depends(get_db)):
-    """National view for policymakers: one card per state."""
-    return analytics_cache.cached(("states",), lambda: scoring.states(db))
+def states(claims: dict = Depends(get_current_user_claims), db: Session = Depends(get_db)):
+    """National view for policymakers: one card per state (officers only see their own state)."""
+    sc = effective_scope(claims)
+    rows = analytics_cache.cached(("states",), lambda: scoring.states(db))
+    return [r for r in rows if not sc["state"] or r["state"] == sc["state"]]
+
+
+@router.get("/districts")
+def districts(state: str | None = None, claims: dict = Depends(get_current_user_claims), db: Session = Depends(get_db)):
+    """State view: one card per district."""
+    sc = effective_scope(claims, state)
+    rows = analytics_cache.cached(("districts", sc["state"]), lambda: scoring.rollup(db, "district", state=sc["state"]))
+    return [r for r in rows if not sc["district"] or r["name"] == sc["district"]]
+
+
+@router.get("/blocks")
+def blocks(district: str | None = None, state: str | None = None, claims: dict = Depends(get_current_user_claims),
+           db: Session = Depends(get_db)):
+    """District view: one card per block / ward."""
+    sc = effective_scope(claims, state, district)
+    return analytics_cache.cached(("blocks", sc["state"], sc["district"]),
+                                  lambda: scoring.rollup(db, "area", state=sc["state"], district=sc["district"]))
 
 
 @router.get("/need-gap")
 def need_gap(country: str | None = None, sector: str | None = None, state: str | None = None, district: str | None = None,
              w_demand: float | None = None, w_deficit: float | None = None, w_vulnerability: float | None = None,
-             w_severity: float | None = None, w_coverage: float | None = None, limit: int = 100, db: Session = Depends(get_db)):
+             w_severity: float | None = None, w_coverage: float | None = None, limit: int = 100,
+             claims: dict = Depends(get_current_user_claims), db: Session = Depends(get_db)):
+    sc = effective_scope(claims, state, district)
     rows = scoring.need_gap(db, _weights(w_demand, w_deficit, w_vulnerability, w_severity, w_coverage))
-    rows = [r for r in rows if (not country or r["country"] == country) and (not sector or sector == "all" or r["sector"] == sector)
-            and (not state or r["state"] == state) and (not district or r["district"] == district)]
+    rows = [r for r in rows if (not sector or sector == "all" or r["sector"] == sector) and row_in_scope(r, sc)]
     return {"weights": {**scoring.DEFAULT_WEIGHTS, **_weights(w_demand, w_deficit, w_vulnerability, w_severity, w_coverage)},
             "total": len(rows), "items": rows[:limit]}
 
 
 @router.get("/areas")
 def areas(sector: str | None = None, state: str | None = None, district: str | None = None, country: str | None = None,
-          db: Session = Depends(get_db)):
+          claims: dict = Depends(get_current_user_claims), db: Session = Depends(get_db)):
+    sc = effective_scope(claims, state, district)
+    if sc["department"] and not sector:
+        sector = sc["department"]
     rows = scoring.area_summary(db, sector=sector)
-    return [a for a in rows if (not state or a["state"] == state) and (not district or a["district"] == district)]
+    return [a for a in rows if row_in_scope(a, {**sc, "department": None})]
 
 
 @router.get("/silent-zones")
-def silent(state: str | None = None, country: str | None = None, db: Session = Depends(get_db)):
-    return scoring.silent_zones(db, state=state)
+def silent(state: str | None = None, district: str | None = None, country: str | None = None,
+           claims: dict = Depends(get_current_user_claims), db: Session = Depends(get_db)):
+    sc = effective_scope(claims, state, district)
+    return [r for r in scoring.silent_zones(db, state=sc["state"]) if row_in_scope(r, sc)]
 
 
 @router.get("/alignment")
-def alignment(state: str | None = None, national: bool = False, country: str | None = None, db: Session = Depends(get_db)):
-    return scoring.alignment(db, state=state, national=national)
+def alignment(state: str | None = None, national: bool = False, country: str | None = None,
+              claims: dict = Depends(get_current_user_claims), db: Session = Depends(get_db)):
+    sc = effective_scope(claims, state)
+    if sc["locked"]:
+        national = False
+    return scoring.alignment(db, state=sc["state"], national=national)
 
 
 @router.get("/trends")
-def trend(state: str | None = None, sector: str | None = None, weeks: int = 12, country: str | None = None, db: Session = Depends(get_db)):
-    return trends.weekly_series(db, weeks, None, sector, state)
+def trend(state: str | None = None, district: str | None = None, sector: str | None = None, weeks: int = 12,
+          country: str | None = None, claims: dict = Depends(get_current_user_claims), db: Session = Depends(get_db)):
+    sc = effective_scope(claims, state, district)
+    return trends.weekly_series(db, weeks, None, sector or sc["department"], sc["state"], sc["district"])
 
 
 @router.get("/alerts")
-def alerts(state: str | None = None, country: str | None = None, db: Session = Depends(get_db)):
-    return trends.alerts(db, state=state)
+def alerts(state: str | None = None, district: str | None = None, country: str | None = None,
+           claims: dict = Depends(get_current_user_claims), db: Session = Depends(get_db)):
+    sc = effective_scope(claims, state, district)
+    return [a for a in trends.alerts(db, state=sc["state"]) if row_in_scope(a, sc)]
 
 
 @router.get("/sectors")
-def sectors(state: str | None = None, country: str | None = None, db: Session = Depends(get_db)):
-    rows = [r for r in scoring.need_gap(db) if not state or r["state"] == state]
+def sectors(state: str | None = None, district: str | None = None, country: str | None = None,
+            claims: dict = Depends(get_current_user_claims), db: Session = Depends(get_db)):
+    sc = effective_scope(claims, state, district)
+    rows = [r for r in scoring.need_gap(db) if row_in_scope(r, sc)]
     out = {}
     for r in rows:
         s = out.setdefault(r["sector"], {"sector": r["sector"], "reports": 0, "households": 0.0, "ngi_sum": 0.0, "n": 0,

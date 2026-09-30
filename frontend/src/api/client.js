@@ -66,6 +66,8 @@ export const api = {
   auditLog: () => request('/api/audit-log'),
   overview: (state) => request('/api/analytics/overview' + qs({ state })),
   states: () => request('/api/analytics/states'),
+  districts: (state) => request('/api/analytics/districts' + qs({ state })),
+  blocks: (district, state) => request('/api/analytics/blocks' + qs({ district, state })),
   needGap: (params) => request('/api/analytics/need-gap' + qs(params)),
   mapAreas: (params) => request('/api/analytics/areas' + qs(params)),
   silent: (state) => request('/api/analytics/silent-zones' + qs({ state })),
@@ -86,4 +88,10 @@ export const api = {
   kpis: () => request('/api/impact/kpis'),
   gramSabha: (district, area) => request('/api/plans/gram-sabha' + qs({ district, area })),
   gramSabhaCsv: (district, area) => `${BASE}/api/plans/gram-sabha.csv${qs({ district, area })}`,
+  // Generic helpers for role-specific endpoints (officer workflows, admin). Path starts with /api/...
+  get: (path, params) => request(path + qs(params || {})),
+  post: (path, body) => request(path, { method: 'POST', body: body ?? {} }),
+  patch: (path, body) => request(path, { method: 'PATCH', body: body ?? {} }),
+  put: (path, body) => request(path, { method: 'PUT', body: body ?? {} }),
+  del: (path) => request(path, { method: 'DELETE' }),
 }

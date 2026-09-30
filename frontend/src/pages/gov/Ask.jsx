@@ -2,14 +2,14 @@ import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { FileText, Mic, Sparkles } from 'lucide-react'
 import { api } from '../../api/client'
-import { useApp } from '../../context/AppContext'
 import { SPEECH_TAG, useT } from '../../i18n'
 import DemandMap from '../../components/map/DemandMap'
 import { Badge, Card, ErrorBox, ListenButton, PageHead, SectorTag } from '../../components/ui'
-import { SECTORS, fmt, money, pct } from '../../lib/format'
+import { DISTRICTS, SECTORS, fmt, money, pct } from '../../lib/format'
+import { AreaLine, placeName, useLevel } from './levelScope'
 
 // Each example was tested against POST /api/query and returns rows.
-const EXAMPLES = [
+const INDIA_EXAMPLES = [
   'Which villages in Adilabad need drinking water but have no plan?',
   'बिहार में सबसे ज़्यादा पानी की समस्या कहाँ है?',
   'తెలంగాణలో నిశ్శబ్ద ప్రాంతాలు చూపించు',
@@ -19,6 +19,26 @@ const EXAMPLES = [
   'ఆదిలాబాద్‌లో తాగునీటి సమస్య ఎక్కడ ఎక్కువ?',
   'Did the completed projects work?',
 ]
+// Local-language examples for the demo areas (the query parser understands these).
+const LOCAL = {
+  Adilabad: ['ఆదిలాబాద్‌లో తాగునీటి సమస్య ఎక్కడ ఎక్కువ?', 'आदिलाबाद में सड़क की समस्या कहाँ है?'],
+  Telangana: ['తెలంగాణలో నిశ్శబ్ద ప్రాంతాలు చూపించు'],
+  Bihar: ['बिहार में सबसे ज़्यादा पानी की समस्या कहाँ है?'],
+  'Uttar Pradesh': ['उत्तर प्रदेश में चुप इलाके दिखाओ'],
+}
+// Examples that fit the officer's own area: a district for Collectors, a state for State officers, India for national planners.
+function examplesFor(level, state, district) {
+  if (level === 'district' && district) {
+    return [`Which villages in ${district} need drinking water but have no plan?`, ...(LOCAL[district] || []), `Show silent areas in ${district}`,
+      `Show hotspots in ${district}`, 'Show early warnings this week', `Where are roads needed most in ${district}?`]
+  }
+  if (level === 'state' && state) {
+    const ds = DISTRICTS[state] || []
+    return [`Which places in ${state} need drinking water but have no plan?`, ...(LOCAL[state] || []), `Show silent areas in ${state}`,
+      ...ds.slice(0, 2).map((d) => `Where is drinking water needed most in ${d}?`), 'Where is spending going to low need areas?', 'Show early warnings this week', 'Did the completed projects work?']
+  }
+  return INDIA_EXAMPLES
+}
 
 const COL = {
   area: 'Place', district: 'District', state: 'State', sector: 'Need', ngi: 'Need level', deficit: 'Missing',
@@ -33,9 +53,9 @@ const INTENT = {
   misaligned_spending: 'Money in low-need places', alerts: 'Early warnings', impact: 'Results of finished work',
 }
 
-function answerText(res, t) {
+function answerText(res, t, home) {
   const it = res.intent, n = res.rows.length
-  const where = t(it.district || it.state || it.area || 'India')
+  const where = it.district || it.state ? t(it.district || it.state) : it.area || home
   const first = res.rows[0]
   switch (it.intent) {
     case 'top_need': return t('{n} places with the biggest need in {where}.', { n, where }) + (first ? ' ' + t('Highest: {a}, need level {v}.', { a: first.area, v: first.ngi }) : '')
@@ -49,8 +69,10 @@ function answerText(res, t) {
 }
 
 export default function Ask() {
-  const { stateParam, uiLang } = useApp()
+  const { level, state: stateParam, district, uiLang } = useLevel()
   const t = useT()
+  const place = placeName(t, { state: stateParam, district })
+  const EXAMPLES = examplesFor(level, stateParam, district)
   const [q, setQ] = useState('')
   const [res, setRes] = useState(null)
   const [busy, setBusy] = useState(false)
@@ -79,14 +101,15 @@ export default function Ask() {
     return String(v)
   }
   const cols = res ? res.columns.filter((c) => !HIDE.has(c)) : []
-  const answer = res ? answerText(res, t) : ''
+  const answer = res ? answerText(res, t, place) : ''
   const points = res?.rows?.filter((r) => r.lat && r.lng).map((r, i) => ({ area_id: r.area_id || i, area: r.area, district: r.district, lat: r.lat, lng: r.lng, population: 100000, ngi_max: r.ngi ?? r.ngi_max ?? r.need_ngi ?? 70, hotspot: { z: r.gi_z ?? '', class: '' }, sectors: {}, silent_zone: res.intent.intent === 'silent_zones', silent_sectors: r.sector ? [r.sector] : [], reports: r.last_week }))
   return (
     <div className="stack-md">
       <PageHead title="Ask a question" eyebrow="Official workspace" steps={['Type or speak a question', 'Or tap an example', 'See the answer and the list']}
-        actions={<Link className="btn" to={`/brief${stateParam ? `?state=${encodeURIComponent(stateParam)}` : ''}`}><FileText size={16} aria-hidden="true" />{t('Make a policy brief')}</Link>}>
-        Ask in English, Hindi or Telugu. Get the answer with numbers.
+        actions={<Link className="btn" to={`/brief${level === 'nation' && stateParam ? `?state=${encodeURIComponent(stateParam)}` : ''}`}><FileText size={16} aria-hidden="true" />{t('Make a policy brief')}</Link>}>
+        <>{t('Ask about {p} in English, Hindi or Telugu. Get the answer with numbers.', { p: place })}</>
       </PageHead>
+      <AreaLine place={place} />
       <Card>
         <form className="row" onSubmit={(e) => { e.preventDefault(); ask() }}>
           <label htmlFor="q" className="sr-only">{t('Your question')}</label>

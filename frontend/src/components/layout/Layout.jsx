@@ -3,11 +3,12 @@ import { Link, NavLink, Navigate, Outlet, useLocation } from 'react-router-dom'
 import { AnimatePresence, motion, useMotionValueEvent, useScroll } from 'framer-motion'
 import {
   Award, BarChart3, BookOpen, Building2, ClipboardList, HandCoins, Inbox, Layers, ListOrdered, LogOut, Megaphone,
-  Menu, MessageCircle, SearchCheck, ShieldCheck, Sparkles, TrendingUp, UserRound, X,
+  MapPin, Menu, MessageCircle, SearchCheck, ShieldCheck, Sparkles, TrendingUp, UserRound, X,
 } from 'lucide-react'
 import { useApp } from '../../context/AppContext'
 import { useT } from '../../i18n'
 import { STATES } from '../../lib/format'
+import { PAGES, can, canSee, jurisdictionText } from '../../lib/roles'
 import LangSwitch, { LanguageWelcome } from './LangSwitch'
 
 // Same links for everyone (citizen side).
@@ -18,37 +19,33 @@ const MAIN = [
   { to: '/channels', label: 'WhatsApp demo', Icon: MessageCircle },
   { to: '/overview', label: 'Guide', Icon: BookOpen },
 ]
-// Official workspace, shown as a second row only after an official logs in.
-const WORK = [
-  { to: '/officer', label: 'Inbox', Icon: Inbox },
-  { to: '/dashboard', label: 'Dashboard', Icon: BarChart3 },
-  { to: '/priorities', label: 'Priorities', Icon: ListOrdered },
-  { to: '/clusters', label: 'Grouped needs', Icon: Layers },
-  { to: '/projects', label: 'Projects & budget', Icon: HandCoins },
-  { to: '/ask', label: 'Ask', Icon: Sparkles },
-  { to: '/impact', label: 'Impact', Icon: TrendingUp },
-]
+// Official workspace: each designation only sees the pages of its own job (lib/roles.js).
+function workLinks(ri) {
+  if (!ri) return []
+  return ri.pages.map((k) => ({ ...PAGES[k], label: k === 'officer' && ri.inboxLabel ? ri.inboxLabel : PAGES[k].label }))
+}
 const MORE = [
   { to: '/trust', label: 'Privacy & open standards', Icon: ShieldCheck },
 ]
 
-const ROLE_LABEL = { field_officer: 'Field officer', district: 'District collector', state: 'State planning officer', national: 'National planner', admin: 'Admin' }
-
-export function RequireOfficial({ children }) {
-  const { isOfficial } = useApp()
+export function RequireOfficial({ children, page }) {
+  const { isOfficial, role, roleInfo: ri } = useApp()
   const loc = useLocation()
   if (!isOfficial) return <Navigate to={`/login?as=official&next=${encodeURIComponent(loc.pathname + loc.search)}`} replace />
+  // Logged in, but this page is not part of this officer's job -> send them to their own home page.
+  if (page && !canSee(role, page)) return <Navigate to={`${ri?.home || '/'}?denied=${page}`} replace />
   return children
 }
+export const RequirePage = RequireOfficial
 
 function Auth() {
-  const { user, isOfficial, isCitizen, logout } = useApp()
+  const { user, isOfficial, isCitizen, logout, roleInfo: ri } = useApp()
   const t = useT()
   if (isOfficial || isCitizen) return (
     <>
       <span className="an-user" title={user?.name}>
         <span className="an-avatar" aria-hidden="true">{(user?.name || '?').replace(/[^A-Za-z]/g, '').slice(0, 1) || 'C'}</span>
-        <span><strong>{user?.name}</strong><small>{t(isCitizen ? 'Citizen' : ROLE_LABEL[user?.role])}</small></span>
+        <span><strong>{user?.name}</strong><small>{t(isCitizen ? 'Citizen' : (ri?.label || ''))}</small></span>
       </span>
       <button className="lp-btn lp-btn-ghost" onClick={logout}><LogOut size={16} aria-hidden="true" />{t('Log out')}</button>
     </>
@@ -62,7 +59,8 @@ function Auth() {
 }
 
 export default function Layout() {
-  const { isOfficial, stateName, setStateName } = useApp()
+  const { isOfficial, stateName, setStateName, role, roleInfo: ri, user } = useApp()
+  const WORK = workLinks(ri)
   const t = useT()
   const [open, setOpen] = useState(false)
   const [solid, setSolid] = useState(false)
@@ -106,19 +104,25 @@ export default function Layout() {
         {isOfficial && (
           <div className="an-work">
             <div className="an-work-inner">
-              <span className="an-work-title">{t('Official workspace')}</span>
+              <span className="an-work-title" title={t(ri?.job || '')}>{t(ri?.label || 'Official workspace')}</span>
               <nav className="an-work-links" aria-label="Official workspace">
                 {WORK.map(({ to, label, Icon }) => (
                   <NavLink key={to} to={to} className="an-pill"><Icon size={15} aria-hidden="true" />{t(label)}</NavLink>
                 ))}
               </nav>
-              <label className="an-country">
-                <span>{t('State')}</span>
-                <select className="lp-lang" value={stateName} onChange={(e) => setStateName(e.target.value)}>
-                  <option value="all">{t('All India')}</option>
-                  {STATES.map((s) => <option key={s} value={s}>{t(s)}</option>)}
-                </select>
-              </label>
+              {can(role, 'pickState') ? (
+                <label className="an-country">
+                  <span>{t('State')}</span>
+                  <select className="lp-lang" value={stateName} onChange={(e) => setStateName(e.target.value)}>
+                    <option value="all">{t('All India')}</option>
+                    {STATES.map((s) => <option key={s} value={s}>{t(s)}</option>)}
+                  </select>
+                </label>
+              ) : (
+                <span className="an-juris" title={t('Your area. You can only see and act on this area.')}>
+                  <MapPin size={14} aria-hidden="true" />{jurisdictionText(user, t)}
+                </span>
+              )}
             </div>
           </div>
         )}

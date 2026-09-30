@@ -1,484 +1,288 @@
-import { useEffect, useState } from 'react'
-import {
-  Building2, CheckCircle2, Filter, KeyRound, MapPin, Plus,
-  Search, ShieldAlert, ShieldCheck, Trash2, UserCheck, UserPlus, Users, X
-} from 'lucide-react'
+// Super admin only: list officer accounts, create a new officer for one designation + area, switch an account off or on.
+import { useEffect, useMemo, useState } from 'react'
+import { AnimatePresence, motion } from 'framer-motion'
+import { CheckCircle2, MapPin, Power, RotateCcw, Search, UserPlus, Users, X } from 'lucide-react'
 import { api } from '../../api/client'
 import { useApp } from '../../context/AppContext'
+import { useT } from '../../i18n'
 import { useAsync } from '../../lib/useAsync'
-import { Badge, Card, ErrorBox, Loading, PageHead } from '../../components/ui'
+import { STATES } from '../../lib/format'
+import { DEPT_LABEL, ROLES, jurisdictionText, normRole } from '../../lib/roles'
+import { Badge, Card, Empty, ErrorBox, Loading, PageHead, Stat } from '../../components/ui'
 
-const ROLE_BADGE_COLOR = {
-  super_admin: 'badge-red',
-  admin: 'badge-blue',
-  state_officer: 'badge-amber',
-  district_officer: 'badge-green',
-  dept_officer: 'badge-violet',
-  field_officer: 'badge-blue',
-  citizen: 'badge-gray',
+// Lowest to highest level.
+const ORDER = ['field_officer', 'dept_officer', 'district_officer', 'state_officer', 'admin', 'super_admin']
+const TONE = { field_officer: 'blue', dept_officer: 'violet', district_officer: 'green', state_officer: 'amber', admin: 'dark', super_admin: 'red' }
+// Which area fields each designation needs.
+const NEEDS = {
+  field_officer: ['state', 'district', 'block', 'department'],
+  dept_officer: ['state', 'district', 'department'],
+  district_officer: ['state', 'district'],
+  state_officer: ['state'],
+  admin: [],
+  super_admin: [],
+}
+const EMPTY = { role: 'field_officer', name: '', title: '', username: '', password: '', state: '', district: '', block: '', department: '' }
+
+function RoleBadge({ role }) {
+  const t = useT()
+  const r = normRole(role)
+  return <Badge tone={TONE[r] || ''}>{t(ROLES[r]?.label || role)}</Badge>
+}
+
+function ActiveBadge({ on }) {
+  const t = useT()
+  return <Badge tone={on ? 'green' : ''}>{t(on ? 'Active' : 'Switched off')}</Badge>
+}
+
+function CreateForm({ meta, onDone, onCancel }) {
+  const t = useT()
+  const [f, setF] = useState(EMPTY)
+  const [busy, setBusy] = useState(false)
+  const [err, setErr] = useState(null)
+  const need = NEEDS[f.role] || []
+  const set = (k) => (e) => setF((x) => ({ ...x, [k]: e.target.value }))
+  const tree = meta?.states_and_districts || []
+  const states = tree.length ? tree.map((s) => s.state) : STATES
+  const districts = tree.find((s) => s.state === f.state)?.districts || []
+  const blocksQ = useAsync(() => (need.includes('block') && f.district ? api.blocks(f.district, f.state) : Promise.resolve([])), [f.role, f.state, f.district])
+  const blocks = (blocksQ.data || []).map((b) => b.name).filter(Boolean)
+  const depts = meta?.departments?.map((d) => d.id) || Object.keys(DEPT_LABEL)
+
+  const missing = [
+    !f.name.trim() && 'name', !f.username.trim() && 'username', f.password.length < 6 && 'password',
+    ...need.filter((k) => !f[k]),
+  ].filter(Boolean)
+
+  const submit = async (e) => {
+    e.preventDefault()
+    if (missing.length) return
+    setBusy(true); setErr(null)
+    const body = {
+      role: f.role, name: f.name.trim(), username: f.username.trim(), password: f.password,
+      title: f.title.trim() || ROLES[f.role].label, user_type: 'officer', country_code: 'IN',
+      state: need.includes('state') ? f.state : null,
+      district: need.includes('district') ? f.district : null,
+      block: need.includes('block') ? f.block : null,
+      department: need.includes('department') ? f.department : null,
+    }
+    try { const res = await api.post('/api/admin/users', body); onDone(res?.user || body) } catch (x) { setErr(x) } finally { setBusy(false) }
+  }
+
+  return (
+    <Card title="New officer" sub="Pick the designation first. Only the needed fields are shown.">
+      <form onSubmit={submit} className="stack-md">
+        <div className="stack">
+          <span className="label">{t('Designation')}</span>
+          <div className="um-roles" role="radiogroup" aria-label={t('Designation')}>
+            {ORDER.map((r) => (
+              <label key={r} className={`um-role ${f.role === r ? 'on' : ''}`}>
+                <input type="radio" name="role" value={r} checked={f.role === r}
+                  onChange={() => setF((x) => ({ ...x, role: r }))} />
+                <strong>{t(ROLES[r].label)}</strong>
+                <span className="xs muted">{t(ROLES[r].job)}</span>
+              </label>
+            ))}
+          </div>
+        </div>
+        <div className="grid g-2">
+          <div className="field"><label htmlFor="um-name">{t('Full name')}</label><input id="um-name" className="input" value={f.name} onChange={set('name')} /></div>
+          <div className="field"><label htmlFor="um-title">{t('Post title (optional)')}</label><input id="um-title" className="input" placeholder={t(ROLES[f.role].label)} value={f.title} onChange={set('title')} /></div>
+          <div className="field"><label htmlFor="um-user">{t('Username')}</label><input id="um-user" className="input mono" autoComplete="off" value={f.username} onChange={(e) => setF((x) => ({ ...x, username: e.target.value.toLowerCase().replace(/[^a-z0-9_.-]/g, '') }))} /></div>
+          <div className="field"><label htmlFor="um-pass">{t('Password')}</label><input id="um-pass" className="input" type="text" autoComplete="new-password" value={f.password} onChange={set('password')} />
+            <span className="help">{t('At least 6 letters or numbers.')}</span></div>
+        </div>
+        {need.length > 0 && (
+          <fieldset className="um-area">
+            <legend><MapPin size={16} aria-hidden="true" />{t('Area of work')}</legend>
+            <div className="grid g-2">
+              {need.includes('state') && (
+                <div className="field"><label htmlFor="um-state">{t('State')}</label>
+                  <select id="um-state" className="select" value={f.state} onChange={(e) => setF((x) => ({ ...x, state: e.target.value, district: '', block: '' }))}>
+                    <option value="">{t('Choose…')}</option>
+                    {states.map((s) => <option key={s} value={s}>{t(s)}</option>)}
+                  </select></div>
+              )}
+              {need.includes('district') && (
+                <div className="field"><label htmlFor="um-dist">{t('District')}</label>
+                  <select id="um-dist" className="select" value={f.district} disabled={!f.state} onChange={(e) => setF((x) => ({ ...x, district: e.target.value, block: '' }))}>
+                    <option value="">{t('Choose…')}</option>
+                    {districts.map((d) => <option key={d} value={d}>{t(d)}</option>)}
+                  </select></div>
+              )}
+              {need.includes('block') && (
+                <div className="field"><label htmlFor="um-block">{t('Block')}</label>
+                  <select id="um-block" className="select" value={f.block} disabled={!f.district} onChange={set('block')}>
+                    <option value="">{t('Choose…')}</option>
+                    {blocks.map((b) => <option key={b} value={b}>{b}</option>)}
+                  </select></div>
+              )}
+              {need.includes('department') && (
+                <div className="field"><label htmlFor="um-dept">{t('Department')}</label>
+                  <select id="um-dept" className="select" value={f.department} onChange={set('department')}>
+                    <option value="">{t('Choose…')}</option>
+                    {depts.map((d) => <option key={d} value={d}>{t(DEPT_LABEL[d] || d)}</option>)}
+                  </select></div>
+              )}
+            </div>
+          </fieldset>
+        )}
+        {need.length === 0 && <div className="alert alert-info"><MapPin size={18} aria-hidden="true" /><div className="small">{t('This designation works for all of India.')}</div></div>}
+        <ErrorBox error={err} />
+        <div className="row">
+          <button className="btn btn-primary btn-lg" disabled={busy || missing.length > 0}><UserPlus size={18} aria-hidden="true" />{t(busy ? 'Creating…' : 'Create account')}</button>
+          <button type="button" className="btn btn-lg" onClick={onCancel}>{t('Cancel')}</button>
+        </div>
+      </form>
+    </Card>
+  )
 }
 
 export default function UserManagement() {
-  const { user: currentUser, isSuperAdmin, t } = useApp()
-  const [roleFilter, setRoleFilter] = useState('all')
-  const [stateFilter, setStateFilter] = useState('all')
+  const { user: me } = useApp()
+  const t = useT()
+  const [role, setRole] = useState('all')
+  const [state, setState] = useState('all')
+  const [q, setQ] = useState('')
   const [search, setSearch] = useState('')
-  const [showCreateModal, setShowCreateModal] = useState(false)
-  const [editUser, setEditUser] = useState(null)
-  const [submitting, setSubmitting] = useState(false)
-  const [msg, setMsg] = useState(null)
-  const [error, setError] = useState(null)
+  const [creating, setCreating] = useState(false)
+  const [done, setDone] = useState(null)
+  const [busyId, setBusyId] = useState(null)
+  const [actErr, setActErr] = useState(null)
 
-  // Directory metadata
-  const metaAsync = useAsync(() => api.rolesAndJurisdictions(), [])
-  const statsAsync = useAsync(() => api.adminStats(), [])
-  
-  // Users list
-  const [usersData, setUsersData] = useState({ total: 0, items: [] })
-  const [loadingUsers, setLoadingUsers] = useState(false)
+  const meta = useAsync(() => api.get('/api/auth/roles-jurisdictions'), [])
+  const stats = useAsync(() => api.get('/api/admin/stats'), [])
+  const list = useAsync(() => api.get('/api/admin/users', { user_type: 'officer', role, state, search, limit: 200 }), [role, state, search])
+  const items = useMemo(() => [...(list.data?.items || [])].sort((a, b) =>
+    (b.is_active - a.is_active) || ORDER.indexOf(normRole(a.role)) - ORDER.indexOf(normRole(b.role)) || (a.name || '').localeCompare(b.name || '')), [list.data])
+  const states = meta.data?.states_and_districts?.map((s) => s.state) || STATES
 
-  const loadUsers = async () => {
-    setLoadingUsers(true)
-    setError(null)
+  useEffect(() => { const id = setTimeout(() => setSearch(q.trim()), 350); return () => clearTimeout(id) }, [q])
+
+  const toggle = async (u) => {
+    setBusyId(u.id); setActErr(null)
     try {
-      const res = await api.adminUsers({
-        role: roleFilter === 'all' ? undefined : roleFilter,
-        state: stateFilter === 'all' ? undefined : stateFilter,
-        search: search.trim() || undefined,
-      })
-      setUsersData(res || { total: 0, items: [] })
-    } catch (err) {
-      setError(err)
-    } finally {
-      setLoadingUsers(false)
-    }
+      await api.put(`/api/admin/users/${u.id}`, { is_active: !u.is_active })
+      list.setData({ ...list.data, items: list.data.items.map((x) => (x.id === u.id ? { ...x, is_active: !u.is_active } : x)) })
+      stats.reload()
+    } catch (x) { setActErr(x) } finally { setBusyId(null) }
   }
-
-  useEffect(() => {
-    loadUsers()
-  }, [roleFilter, stateFilter])
-
-  const handleSearchSubmit = (e) => {
-    e.preventDefault()
-    loadUsers()
-  }
-
-  // Create Officer Form State
-  const [formData, setFormData] = useState({
-    username: '',
-    password: '',
-    name: '',
-    title: '',
-    role: 'district_officer',
-    state: 'Telangana',
-    district: 'Adilabad',
-    department: 'water',
-  })
-
-  const handleCreateSubmit = async (e) => {
-    e.preventDefault()
-    setSubmitting(true)
-    setError(null)
-    try {
-      const res = await api.createOfficer(formData)
-      setMsg(res.message || 'Officer account created successfully.')
-      setShowCreateModal(false)
-      setFormData({
-        username: '',
-        password: '',
-        name: '',
-        title: '',
-        role: 'district_officer',
-        state: 'Telangana',
-        district: 'Adilabad',
-        department: 'water',
-      })
-      loadUsers()
-      statsAsync.reload()
-    } catch (err) {
-      setError(err)
-    } finally {
-      setSubmitting(false)
-    }
-  }
-
-  const handleUpdateSubmit = async (e) => {
-    e.preventDefault()
-    if (!editUser) return
-    setSubmitting(true)
-    setError(null)
-    try {
-      await api.updateOfficer(editUser.id, {
-        name: editUser.name,
-        title: editUser.title,
-        role: editUser.role,
-        state: editUser.state,
-        district: editUser.district,
-        department: editUser.department,
-        is_active: editUser.is_active,
-      })
-      setMsg(`User ${editUser.username} updated successfully.`)
-      setEditUser(null)
-      loadUsers()
-    } catch (err) {
-      setError(err)
-    } finally {
-      setSubmitting(false)
-    }
-  }
-
-  const handleDeactivate = async (id, username) => {
-    if (!window.confirm(`Deactivate account for ${username}?`)) return
-    try {
-      await api.deleteOfficer(id)
-      setMsg(`Officer ${username} deactivated.`)
-      loadUsers()
-      statsAsync.reload()
-    } catch (err) {
-      setError(err)
-    }
-  }
-
-  const rolesMeta = metaAsync.data?.roles || []
-  const statesTree = metaAsync.data?.states_and_districts || []
-  const departments = metaAsync.data?.departments || []
-  const selectedStateObj = statesTree.find(s => s.state === (editUser ? editUser.state : formData.state))
-  const availableDistricts = selectedStateObj?.districts || []
+  const locked = (u) => u.id === me?.id || u.username === 'superadmin'
+  const toggleBtn = (u) => locked(u) ? <span className="xs muted">{t('Your account')}</span> : (
+    <button type="button" className={`btn btn-sm ${u.is_active ? '' : 'btn-success'}`} disabled={busyId === u.id} onClick={() => toggle(u)}
+      aria-label={t(u.is_active ? 'Switch off {name}' : 'Switch on {name}', { name: u.name })}>
+      {u.is_active ? <Power size={16} aria-hidden="true" /> : <RotateCcw size={16} aria-hidden="true" />}{t(u.is_active ? 'Switch off' : 'Switch on')}
+    </button>
+  )
+  const area = (u) => jurisdictionText(u, t)
 
   return (
     <div className="stack-md">
-      <PageHead
-        title={t('user_management_title', 'User & Officer Access Management')}
-        actions={
-          isSuperAdmin && (
-            <button className="btn btn-primary" onClick={() => setShowCreateModal(true)}>
-              <UserPlus size={16} aria-hidden="true" /> {t('add_new_officer', 'Create Officer Account')}
-            </button>
-          )
+      <style>{`
+        .um-roles { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+        .um-role { display: flex; flex-direction: column; gap: 4px; padding: 12px 14px; border: 1.5px solid #e2e8f0; border-radius: 14px; cursor: pointer; background: #fff; min-height: 44px; }
+        .um-role input { position: absolute; opacity: 0; pointer-events: none; }
+        .um-role.on { border-color: #2563eb; background: #eff6ff; box-shadow: 0 0 0 3px #dbeafe; }
+        .um-role:focus-within { outline: 3px solid #93c5fd; outline-offset: 2px; }
+        .um-area { border: 1px solid #e2e8f0; border-radius: 14px; padding: 12px 16px 16px; margin: 0; min-width: 0; }
+        .um-area legend { display: inline-flex; gap: 6px; align-items: center; font-weight: 600; font-size: .9rem; padding: 0 6px; }
+        .um-filters { display: grid; grid-template-columns: 1fr 1fr 1.4fr; gap: 12px; align-items: end; }
+        .um-search { position: relative; }
+        .um-search svg { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: #64748b; }
+        .um-search .input { padding-left: 38px; width: 100%; }
+        .um-cards { display: none; }
+        .um-stats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
+        .um-off td { color: #94a3b8; }
+        @media (max-width: 900px) { .um-roles { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+        @media (max-width: 720px) {
+          .um-table { display: none; } .um-cards { display: grid; gap: 10px; }
+          .um-filters { grid-template-columns: 1fr 1fr; } .um-filters .um-search { grid-column: 1 / -1; }
+          .um-roles { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+          .um-role { padding: 10px 12px; } .um-role:not(.on) .xs { display: none; } .um-role.on { grid-column: 1 / -1; }
+          .um-stats { gap: 8px; } .um-stats .card { padding: 10px 12px; } .um-stats .stat-value { font-size: 1.4rem; }
+          .um-stats .stat-label { font-size: .75rem; line-height: 1.25; }
         }
-      >
-        {t('user_management_sub', 'Hierarchical role-based access control (RBAC), administrative jurisdictions, and active officer accounts.')}
+        .um-card { border: 1px solid #e2e8f0; border-radius: 14px; padding: 12px 14px; display: grid; gap: 8px; background: #fff; }
+        .um-card.off { background: #f8fafc; }
+      `}</style>
+      <PageHead title="Officer accounts" eyebrow="Super admin" icon={Users}
+        actions={!creating && <button className="btn btn-hero btn-lg" onClick={() => { setCreating(true); setDone(null) }}><UserPlus size={18} aria-hidden="true" />{t('New officer')}</button>}
+        steps={['Filter by designation or state', 'Create an account for one area', 'Switch off an account when someone leaves']}>
+        Each officer sees only the work and area of their designation.
       </PageHead>
 
-      <ErrorBox error={error} />
-      {msg && (
-        <div className="alert alert-success">
-          <CheckCircle2 size={18} aria-hidden="true" />
-          <div>{msg}</div>
+      {stats.data && (
+        <div className="um-stats">
+          <Stat label="Active officers" value={stats.data.total_officers} icon={Users} tone="blue" />
+          <Stat label="States covered" value={stats.data.states_covered} icon={MapPin} />
+          <Stat label="Districts covered" value={stats.data.districts_covered} icon={MapPin} />
         </div>
       )}
 
-      {/* RBAC System Statistics */}
-      {statsAsync.data && (
-        <div className="grid g-4" aria-label="RBAC System Statistics">
-          <div className="card stat tile-blue">
-            <span className="stat-label"><Users size={16} /> Total Officers</span>
-            <span className="stat-value">{statsAsync.data.total_officers}</span>
-          </div>
-          <div className="card stat tile-green">
-            <span className="stat-label"><Building2 size={16} /> States Covered</span>
-            <span className="stat-value">{statsAsync.data.states_covered}</span>
-          </div>
-          <div className="card stat tile-amber">
-            <span className="stat-label"><MapPin size={16} /> Districts Covered</span>
-            <span className="stat-value">{statsAsync.data.districts_covered}</span>
-          </div>
-          <div className="card stat tile-blue">
-            <span className="stat-label"><ShieldCheck size={16} /> Proofs Verified</span>
-            <span className="stat-value">{statsAsync.data.total_proofs_verified}</span>
-          </div>
-        </div>
-      )}
-
-      {/* Filter and Search Bar */}
-      <Card>
-        <div className="row-between" style={{ flexWrap: 'wrap', gap: 12 }}>
-          <form onSubmit={handleSearchSubmit} className="row" style={{ flex: 1, minWidth: 280 }}>
-            <input
-              className="input"
-              placeholder="Search by name, username or designation…"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              style={{ flex: 1 }}
-            />
-            <button className="btn"><Search size={16} /> Search</button>
-          </form>
-
-          <div className="row" style={{ gap: 8 }}>
-            <label className="row small">
-              <span className="muted">Role:</span>
-              <select className="select" style={{ width: 'auto', minHeight: 36 }} value={roleFilter} onChange={(e) => setRoleFilter(e.target.value)}>
-                <option value="all">All Roles</option>
-                {rolesMeta.map((r) => (
-                  <option key={r.role} value={r.role}>{r.label}</option>
-                ))}
-              </select>
-            </label>
-
-            <label className="row small">
-              <span className="muted">State:</span>
-              <select className="select" style={{ width: 'auto', minHeight: 36 }} value={stateFilter} onChange={(e) => setStateFilter(e.target.value)}>
-                <option value="all">All States</option>
-                {statesTree.map((s) => (
-                  <option key={s.state} value={s.state}>{s.state}</option>
-                ))}
-              </select>
-            </label>
-          </div>
-        </div>
-      </Card>
-
-      {/* Officers and Users Table */}
-      <Card title={`Registered Accounts (${usersData.total})`} sub="Role designations and territorial jurisdiction boundaries">
-        {loadingUsers ? <Loading height={240} /> : (
-          <div className="table-wrap">
-            <table className="table">
-              <thead>
-                <tr>
-                  <th>Officer / User</th>
-                  <th>Role Rank</th>
-                  <th>Assigned Jurisdiction</th>
-                  <th>Department / Sector</th>
-                  <th>Status</th>
-                  {isSuperAdmin && <th className="num">Actions</th>}
-                </tr>
-              </thead>
-              <tbody>
-                {(usersData.items || []).map((u) => (
-                  <tr key={u.id} style={{ opacity: u.is_active ? 1 : 0.55 }}>
-                    <td>
-                      <div><strong>{u.name}</strong></div>
-                      <div className="xs muted mono">{u.username} · {u.title || 'Official'}</div>
-                    </td>
-                    <td>
-                      <span className={`badge ${ROLE_BADGE_COLOR[u.role] || 'badge-blue'}`}>
-                        {u.role.replace(/_/g, ' ').toUpperCase()}
-                      </span>
-                    </td>
-                    <td className="small">
-                      {u.role === 'super_admin' || u.role === 'admin' ? (
-                        <span className="badge badge-dark">National (All States)</span>
-                      ) : (
-                        <span>
-                          {u.state || 'All States'} {u.district ? `· ${u.district}` : ''}
-                        </span>
-                      )}
-                    </td>
-                    <td className="small">
-                      {u.department ? (
-                        <span className="badge badge-violet">{u.department.toUpperCase()}</span>
-                      ) : (
-                        <span className="muted xs">All Departments</span>
-                      )}
-                    </td>
-                    <td>
-                      {u.is_active ? (
-                        <span className="badge badge-green xs">Active</span>
-                      ) : (
-                        <span className="badge badge-red xs">Deactivated</span>
-                      )}
-                    </td>
-                    {isSuperAdmin && (
-                      <td className="num">
-                        <div className="row justify-end" style={{ justifyContent: 'flex-end', gap: 6 }}>
-                          <button
-                            className="btn btn-sm btn-ghost"
-                            onClick={() => setEditUser({ ...u })}
-                            title="Edit Role or Jurisdiction"
-                          >
-                            Edit
-                          </button>
-                          {u.username !== 'superadmin' && u.is_active && (
-                            <button
-                              className="btn btn-sm btn-danger"
-                              style={{ padding: '4px 8px' }}
-                              onClick={() => handleDeactivate(u.id, u.username)}
-                              title="Deactivate Account"
-                            >
-                              <Trash2 size={13} />
-                            </button>
-                          )}
-                        </div>
-                      </td>
-                    )}
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+      <AnimatePresence>
+        {done && (
+          <motion.div initial={{ opacity: 0, y: -6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="alert alert-success" role="status">
+            <CheckCircle2 size={18} aria-hidden="true" />
+            <div style={{ flex: 1 }}><strong>{t('Account created')}</strong>: {done.name} <span className="mono small">({done.username})</span>
+              <div className="small">{t(ROLES[normRole(done.role)]?.label || done.role)} · {area(done)}</div></div>
+            <button type="button" className="btn btn-sm btn-ghost" onClick={() => setDone(null)} aria-label={t('Close')}><X size={16} aria-hidden="true" /></button>
+          </motion.div>
         )}
+      </AnimatePresence>
+
+      {creating && <CreateForm meta={meta.data} onCancel={() => setCreating(false)}
+        onDone={(u) => { setCreating(false); setDone(u); list.reload(); stats.reload() }} />}
+
+      <Card title="All officers" sub={list.data ? <>{t('{n} accounts', { n: list.data.total })}</> : undefined}>
+        <div className="stack-md">
+          <div className="um-filters">
+            <div className="field"><label htmlFor="um-frole">{t('Designation')}</label>
+              <select id="um-frole" className="select" value={role} onChange={(e) => setRole(e.target.value)}>
+                <option value="all">{t('All designations')}</option>
+                {ORDER.map((r) => <option key={r} value={r}>{t(ROLES[r].label)}</option>)}
+              </select></div>
+            <div className="field"><label htmlFor="um-fstate">{t('State')}</label>
+              <select id="um-fstate" className="select" value={state} onChange={(e) => setState(e.target.value)}>
+                <option value="all">{t('All states')}</option>
+                {states.map((s) => <option key={s} value={s}>{t(s)}</option>)}
+              </select></div>
+            <div className="field um-search"><label htmlFor="um-q">{t('Search')}</label>
+              <div style={{ position: 'relative' }}><Search size={16} aria-hidden="true" />
+                <input id="um-q" className="input" placeholder={t('Name or username')} value={q} onChange={(e) => setQ(e.target.value)} /></div></div>
+          </div>
+          <ErrorBox error={list.error || actErr} />
+          {list.loading && !list.data ? <Loading /> : items.length === 0 ? <Empty>No officers match.</Empty> : (
+            <>
+              <div className="table-wrap um-table">
+                <table className="table">
+                  <thead><tr><th>{t('Officer')}</th><th>{t('Designation')}</th><th>{t('Area')}</th><th>{t('Status')}</th><th><span className="sr-only">{t('Action')}</span></th></tr></thead>
+                  <tbody>
+                    {items.map((u) => (
+                      <tr key={u.id} className={u.is_active ? '' : 'um-off'}>
+                        <td><strong>{u.name}</strong><div className="xs muted">{u.title}</div><div className="xs mono muted">{u.username}</div></td>
+                        <td><RoleBadge role={u.role} /></td>
+                        <td className="small">{area(u)}</td>
+                        <td><ActiveBadge on={u.is_active} /></td>
+                        <td style={{ textAlign: 'right' }}>{toggleBtn(u)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              <div className="um-cards">
+                {items.map((u) => (
+                  <div key={u.id} className={`um-card ${u.is_active ? '' : 'off'}`}>
+                    <div className="row-between"><strong>{u.name}</strong><ActiveBadge on={u.is_active} /></div>
+                    <div className="row" style={{ gap: 8 }}><RoleBadge role={u.role} /><span className="xs mono muted">{u.username}</span></div>
+                    <div className="small row" style={{ gap: 6 }}><MapPin size={14} aria-hidden="true" />{area(u)}</div>
+                    <div>{toggleBtn(u)}</div>
+                  </div>
+                ))}
+              </div>
+            </>
+          )}
+        </div>
       </Card>
-
-      {/* Create Officer Modal */}
-      {showCreateModal && (
-        <div className="modal-overlay" onClick={() => setShowCreateModal(false)}>
-          <div className="modal-dialog modal-md" onClick={(e) => e.stopPropagation()}>
-            <div className="modal-header">
-              <h3 style={{ margin: 0 }}>Create Officer Account</h3>
-              <button className="btn btn-sm" onClick={() => setShowCreateModal(false)}>✕</button>
-            </div>
-            <form onSubmit={handleCreateSubmit}>
-              <div className="modal-body stack-md">
-                <div className="grid g-2">
-                  <div className="field">
-                    <label>Full Name</label>
-                    <input className="input" required value={formData.name} onChange={(e) => setFormData({ ...formData, name: e.target.value })} placeholder="e.g. Dr. Ramesh Chandra, IAS" />
-                  </div>
-                  <div className="field">
-                    <label>Designation / Title</label>
-                    <input className="input" required value={formData.title} onChange={(e) => setFormData({ ...formData, title: e.target.value })} placeholder="e.g. District Magistrate" />
-                  </div>
-                </div>
-
-                <div className="grid g-2">
-                  <div className="field">
-                    <label>Username</label>
-                    <input className="input mono" required value={formData.username} onChange={(e) => setFormData({ ...formData, username: e.target.value })} placeholder="e.g. dm_warangal" />
-                  </div>
-                  <div className="field">
-                    <label>Temporary Password</label>
-                    <input className="input" type="password" required value={formData.password} onChange={(e) => setFormData({ ...formData, password: e.target.value })} placeholder="••••••••" />
-                  </div>
-                </div>
-
-                <div className="field">
-                  <label>Role Rank</label>
-                  <select className="select" value={formData.role} onChange={(e) => setFormData({ ...formData, role: e.target.value })}>
-                    {rolesMeta.map((r) => (
-                      <option key={r.role} value={r.role}>{r.label}</option>
-                    ))}
-                  </select>
-                  <span className="help">{rolesMeta.find(r => r.role === formData.role)?.description}</span>
-                </div>
-
-                {formData.role !== 'super_admin' && formData.role !== 'admin' && (
-                  <div className="grid g-2">
-                    <div className="field">
-                      <label>State</label>
-                      <select className="select" value={formData.state} onChange={(e) => setFormData({ ...formData, state: e.target.value })}>
-                        {statesTree.map((s) => (
-                          <option key={s.state} value={s.state}>{s.state}</option>
-                        ))}
-                      </select>
-                    </div>
-
-                    {['district_officer', 'field_officer'].includes(formData.role) && (
-                      <div className="field">
-                        <label>District Jurisdiction</label>
-                        <select className="select" value={formData.district} onChange={(e) => setFormData({ ...formData, district: e.target.value })}>
-                          {availableDistricts.map((d) => (
-                            <option key={d} value={d}>{d}</option>
-                          ))}
-                        </select>
-                      </div>
-                    )}
-                  </div>
-                )}
-
-                {['dept_officer', 'field_officer'].includes(formData.role) && (
-                  <div className="field">
-                    <label>Department / Ministry</label>
-                    <select className="select" value={formData.department} onChange={(e) => setFormData({ ...formData, department: e.target.value })}>
-                      {departments.map((dep) => (
-                        <option key={dep.id} value={dep.id}>{dep.label}</option>
-                      ))}
-                    </select>
-                  </div>
-                )}
-              </div>
-              <div className="modal-footer">
-                <button type="button" className="btn btn-ghost" onClick={() => setShowCreateModal(false)}>Cancel</button>
-                <button type="submit" className="btn btn-primary" disabled={submitting}>
-                  {submitting ? 'Creating Account…' : 'Create Officer'}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {/* Edit Officer Modal */}
-      {editUser && (
-        <div className="modal-overlay" onClick={() => setEditUser(null)}>
-          <div className="modal-dialog modal-md" onClick={(e) => e.stopPropagation()}>
-            <div className="modal-header">
-              <h3 style={{ margin: 0 }}>Edit Jurisdiction: {editUser.username}</h3>
-              <button className="btn btn-sm" onClick={() => setEditUser(null)}>✕</button>
-            </div>
-            <form onSubmit={handleUpdateSubmit}>
-              <div className="modal-body stack-md">
-                <div className="grid g-2">
-                  <div className="field">
-                    <label>Full Name</label>
-                    <input className="input" value={editUser.name} onChange={(e) => setEditUser({ ...editUser, name: e.target.value })} />
-                  </div>
-                  <div className="field">
-                    <label>Title</label>
-                    <input className="input" value={editUser.title} onChange={(e) => setEditUser({ ...editUser, title: e.target.value })} />
-                  </div>
-                </div>
-
-                <div className="field">
-                  <label>Role</label>
-                  <select className="select" value={editUser.role} onChange={(e) => setEditUser({ ...editUser, role: e.target.value })}>
-                    {rolesMeta.map((r) => (
-                      <option key={r.role} value={r.role}>{r.label}</option>
-                    ))}
-                  </select>
-                </div>
-
-                {editUser.role !== 'super_admin' && editUser.role !== 'admin' && (
-                  <div className="grid g-2">
-                    <div className="field">
-                      <label>State</label>
-                      <select className="select" value={editUser.state || ''} onChange={(e) => setEditUser({ ...editUser, state: e.target.value })}>
-                        {statesTree.map((s) => (
-                          <option key={s.state} value={s.state}>{s.state}</option>
-                        ))}
-                      </select>
-                    </div>
-
-                    {['district_officer', 'field_officer'].includes(editUser.role) && (
-                      <div className="field">
-                        <label>District Jurisdiction</label>
-                        <select className="select" value={editUser.district || ''} onChange={(e) => setEditUser({ ...editUser, district: e.target.value })}>
-                          {availableDistricts.map((d) => (
-                            <option key={d} value={d}>{d}</option>
-                          ))}
-                        </select>
-                      </div>
-                    )}
-                  </div>
-                )}
-
-                {['dept_officer', 'field_officer'].includes(editUser.role) && (
-                  <div className="field">
-                    <label>Department</label>
-                    <select className="select" value={editUser.department || ''} onChange={(e) => setEditUser({ ...editUser, department: e.target.value })}>
-                      {departments.map((dep) => (
-                        <option key={dep.id} value={dep.id}>{dep.label}</option>
-                      ))}
-                    </select>
-                  </div>
-                )}
-
-                <div className="field">
-                  <label className="row" style={{ cursor: 'pointer' }}>
-                    <input type="checkbox" checked={editUser.is_active} onChange={(e) => setEditUser({ ...editUser, is_active: e.target.checked })} />
-                    <span>Account Active</span>
-                  </label>
-                </div>
-              </div>
-              <div className="modal-footer">
-                <button type="button" className="btn btn-ghost" onClick={() => setEditUser(null)}>Cancel</button>
-                <button type="submit" className="btn btn-primary" disabled={submitting}>
-                  {submitting ? 'Saving Changes…' : 'Save Changes'}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
     </div>
   )
 }

@@ -13,7 +13,7 @@ export const SECTORS = {
 export const SECTOR_KEYS = ['water', 'roads', 'sanitation', 'electricity', 'health', 'education']
 
 // India-only deployment: five pilot states across Telugu, Hindi, Odia and Bhojpuri regions
-export const STATES = ['Telangana', 'Odisha', 'Delhi', 'Bihar', 'Uttar Pradesh']
+export const STATES = ['Telangana', 'Odisha', 'Delhi', 'Bihar', 'Uttar Pradesh', 'Maharashtra', 'Karnataka']
 export const DISTRICTS = { Telangana: ['Adilabad', 'Hyderabad'], Odisha: ['Koraput'], Delhi: ['North East Delhi', 'North West Delhi', 'South Delhi', 'East Delhi', 'South West Delhi'], Bihar: ['Gaya'], 'Uttar Pradesh': ['Bahraich'] }
 export const COUNTRIES = { IN: 'India' } // kept for older imports
 
@@ -58,6 +58,8 @@ export const STATUS_LABEL = {
   resolved_pending_verification: 'Awaiting citizen check', closed: 'Closed (verified)', reopened: 'Reopened',
   recommended: 'Awaiting decision', approved: 'Approved', deferred: 'Deferred', rejected: 'Rejected', completed: 'Completed', planned: 'Planned', sanctioned: 'Sanctioned',
   open: 'Open', resolved: 'Resolved',
+  assigned: 'Assigned', proposed: 'Proposed', district_approved: 'Approved by district', state_approved: 'Approved by state',
+  funded: 'Money released', in_execution: 'Work in progress', escalated: 'Escalated',
 }
 export const STATUS_TONE = {
   needs_review: 'amber', reopened: 'red', closed: 'green', completed: 'green', approved: 'green', in_progress: 'blue', in_plan: 'blue',

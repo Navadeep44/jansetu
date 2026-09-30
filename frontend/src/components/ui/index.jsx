@@ -4,6 +4,8 @@ import { AlertTriangle, Loader2, Square, Volume2 } from 'lucide-react'
 import { useState as useStateR, useEffect as useEffectR } from 'react'
 import { useApp } from '../../context/AppContext'
 import { SPEECH_TAG, useT } from '../../i18n'
+import { useLocation } from 'react-router-dom'
+import RoleCard, { DeniedNotice } from '../layout/RoleCard'
 import { SECTORS, STATUS_LABEL, STATUS_TONE, ngiColor } from '../../lib/format'
 
 export function Card({ title, sub, actions, children, className = '', ...rest }) {
@@ -143,7 +145,24 @@ export function Seg({ options, value, onChange, label }) {
 
 // Dark hero band at the top of every page (matches the landing page).
 // steps: 2-4 very short "how to use this page" hints shown as numbered chips.
-export function PageHead({ title, children, actions, eyebrow, steps, icon: Icon, overlap = true, listen = true }) {
+export function PageHead(props) {
+  // On an officer's own home page, show "your job" right under the header (and a notice if they were redirected).
+  const { isOfficial, roleInfo: ri } = useApp()
+  const loc = useLocation()
+  const atHome = isOfficial && ri && loc.pathname === ri.home
+  const denied = isOfficial && new URLSearchParams(loc.search).get('denied')
+  if (!atHome && !denied) return <PageHeadInner {...props} />
+  return (
+    <>
+      <PageHeadInner {...props} />
+      <div className="stack">
+        {atHome ? <RoleCard /> : <DeniedNotice />}
+      </div>
+    </>
+  )
+}
+
+function PageHeadInner({ title, children, actions, eyebrow, steps, icon: Icon, overlap = true, listen = true }) {
   const t = useT()
   const T = (x) => (typeof x === 'string' ? t(x) : x)
   const spoken = [title, children, ...(steps || [])].map(T).filter((x) => typeof x === 'string').join('. ')

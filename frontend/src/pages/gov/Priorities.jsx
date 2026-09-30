@@ -1,11 +1,23 @@
 import { useEffect, useState } from 'react'
 import { Download, RotateCcw, VolumeX } from 'lucide-react'
 import { api } from '../../api/client'
-import { useApp } from '../../context/AppContext'
 import { useT } from '../../i18n'
 import { useAsync } from '../../lib/useAsync'
 import { Badge, Card, ErrorBox, Loading, NgiBar, PageHead, SectorTag, Tabs } from '../../components/ui'
-import { SECTORS, SECTOR_KEYS, fmt, pct } from '../../lib/format'
+import { DISTRICTS, SECTORS, SECTOR_KEYS, fmt, pct } from '../../lib/format'
+import { AreaLine, placeName, useLevel } from './levelScope'
+
+// Scoped officers download exactly the rows they can see (the open-data CSV is state-wide).
+function downloadRows(rows, name) {
+  const cols = ['state', 'district', 'area', 'sector', 'ngi', 'effective_households', 'deficit', 'silent_zone', 'covered']
+  const esc = (v) => (v === null || v === undefined ? '' : /[",\n]/.test(String(v)) ? `"${String(v).replace(/"/g, '""')}"` : String(v))
+  const csv = [cols.join(','), ...rows.map((r) => cols.map((c) => esc(r[c])).join(','))].join('\n')
+  const a = document.createElement('a')
+  a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv' }))
+  a.download = name
+  a.click()
+  setTimeout(() => URL.revokeObjectURL(a.href), 1000)
+}
 
 const DEFAULTS = { demand: 0.3, deficit: 0.3, vulnerability: 0.2, severity: 0.2, coverage: 0.5 }
 const LABELS = {
@@ -18,23 +30,37 @@ const LABELS = {
 const weightWord = (v) => (v === 0 ? 'Not counted' : v < 0.2 ? 'A little' : v < 0.4 ? 'Some' : v < 0.7 ? 'A lot' : 'Most')
 
 export default function Priorities() {
-  const { stateParam } = useApp()
+  const { level, state: stateParam, district: fixedDistrict } = useLevel()
   const t = useT()
+  const [picked, setPicked] = useState('all') // state officers: one district of their own state
+  const district = level === 'state' ? (picked === 'all' ? undefined : picked) : fixedDistrict
+  const place = placeName(t, { state: stateParam, district })
   const [tab, setTab] = useState('ngi')
   const [w, setW] = useState(DEFAULTS)
   const [dw, setDw] = useState(DEFAULTS)
   const [sector, setSector] = useState('all')
   useEffect(() => { const h = setTimeout(() => setDw(w), 250); return () => clearTimeout(h) }, [w])
-  const ng = useAsync(() => api.needGap({ state: stateParam, sector, limit: 40, w_demand: dw.demand, w_deficit: dw.deficit,
-    w_vulnerability: dw.vulnerability, w_severity: dw.severity, w_coverage: dw.coverage }), [stateParam, sector, dw])
-  const silent = useAsync(() => api.silent(stateParam), [stateParam])
+  const ng = useAsync(() => api.needGap({ state: stateParam, district, sector, limit: 40, w_demand: dw.demand, w_deficit: dw.deficit,
+    w_vulnerability: dw.vulnerability, w_severity: dw.severity, w_coverage: dw.coverage }), [stateParam, district, sector, dw])
+  const silent = useAsync(() => api.get('/api/analytics/silent-zones', { state: stateParam, district }), [stateParam, district])
 
   return (
     <div className="stack-md">
       <PageHead title="Priority list" eyebrow="Official workspace" steps={['Top rows need help most', 'Move sliders to change what matters', 'Download the list']}
-        actions={<a className="btn" href={api.exportUrl(stateParam)} download><Download size={16} aria-hidden="true" />{t('Download (CSV)')}</a>}>
-        Which places need help most. Move the sliders to change what matters.
+        actions={level === 'nation'
+          ? <a className="btn" href={api.exportUrl(stateParam)} download><Download size={16} aria-hidden="true" />{t('Download (CSV)')}</a>
+          : <button type="button" className="btn" disabled={!ng.data} onClick={() => downloadRows(ng.data.items, `jansetu-priorities-${(district || stateParam || 'area').toLowerCase().replace(/\s+/g, '-')}.csv`)}><Download size={16} aria-hidden="true" />{t('Download (CSV)')}</button>}>
+        <>{t('Which places in {p} need help most. Move the sliders to change what matters.', { p: place })}</>
       </PageHead>
+      <div className="row-between" style={{ gap: 10 }}>
+        <AreaLine place={place} />
+        {level === 'state' && (
+          <label className="row small"><span className="muted">{t('District')}</span>
+            <select className="select" style={{ width: 'auto', minHeight: 44 }} value={picked} onChange={(e) => setPicked(e.target.value)}>
+              <option value="all">{t('Whole state')}</option>{(DISTRICTS[stateParam] || []).map((d) => <option key={d} value={d}>{t(d)}</option>)}
+            </select></label>
+        )}
+      </div>
       <Tabs value={tab} onChange={setTab} tabs={[{ value: 'ngi', label: 'Priority list' }, { value: 'silent', label: <>{t('Silent areas ({n})', { n: silent.data?.length ?? '…' })}</> }]} />
       {tab === 'ngi' ? (
         <div className="grid g-main" style={{ gridTemplateColumns: 'minmax(0, 2fr) minmax(280px, 1fr)' }}>
@@ -44,7 +70,7 @@ export default function Priorities() {
             <ErrorBox error={ng.error} />
             {!ng.data ? <Loading height={400} /> : (
               <div className="table-wrap"><table className="table">
-                <thead><tr><th>#</th><th>{t('Place')}</th><th>{t('State')}</th><th>{t('Need')}</th><th className="num">{t('Families who asked')}</th><th className="num">{t('Missing')}</th><th>{t('Need level')}</th></tr></thead>
+                <thead><tr><th>#</th><th>{t('Place')}</th>{level === 'nation' && <th>{t('State')}</th>}<th>{t('Need')}</th><th className="num">{t('Families who asked')}</th><th className="num">{t('Missing')}</th><th>{t('Need level')}</th></tr></thead>
                 <tbody>{ng.data.items.map((r, i) => (
                   <tr key={`${r.area_id}-${r.sector}`}>
                     <td className="mono muted">{i + 1}</td>
@@ -53,7 +79,7 @@ export default function Priorities() {
                         {r.silent_zone && <Badge tone="violet">{t('Silent area')}</Badge>}
                         {r.covered ? <Badge tone="blue">{t('Plan exists')}</Badge> : null}
                         {r.coordinated_reports > 0 && <Badge tone="amber">{t('Copy-paste messages')}</Badge>}</div></td>
-                    <td className="small">{t(r.state)}</td>
+                    {level === 'nation' && <td className="small">{t(r.state)}</td>}
                     <td><SectorTag sector={r.sector} short /></td>
                     <td className="num">{fmt(r.effective_households)}</td><td className="num">{pct(r.deficit)}</td>
                     <td style={{ minWidth: 150 }}><NgiBar value={r.ngi} /></td>
@@ -88,7 +114,7 @@ export default function Priorities() {
         <div className="stack-md">
           <div className="alert alert-violet"><VolumeX size={20} aria-hidden="true" />
             <div><strong>{t('Silent areas')}</strong>: {t('services are very poor, but almost nobody reports. Often people have no phone. Send someone to listen.')}</div></div>
-          {silent.loading ? <Loading height={300} /> : (
+          {silent.loading ? <Loading height={300} /> : !silent.data?.length ? <Card><p className="muted">{t('No silent areas in {p}.', { p: place })}</p></Card> : (
             <div className="grid g-2">
               {(silent.data || []).map((r) => (
                 <Card key={`${r.area_id}-${r.sector}`} className="highlight" title={<>{r.area}</>} sub={<>{t(r.district)}, {t(r.state)}</>} actions={<SectorTag sector={r.sector} short />}>

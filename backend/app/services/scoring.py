@@ -195,30 +195,37 @@ def alignment(db: Session, country: str | None = None, state: str | None = None,
 
 
 def states(db: Session) -> list[dict]:
-    """National view: one row per state for policymakers (drill down to districts)."""
-    rows = need_gap(db)
-    al = alignment(db)
+    """National view for policymakers: one row per state."""
+    return rollup(db, "state")
+
+
+def rollup(db: Session, by: str = "state", state: str | None = None, district: str | None = None) -> list[dict]:
+    """One row per state / district / area (block or ward), for drill-down views."""
+    rows = [r for r in need_gap(db) if (not state or r["state"] == state) and (not district or r["district"] == district)]
+    al = alignment(db) if by == "state" else {}
+    key = {"state": "state", "district": "district", "area": "area"}[by]
     out = {}
     for r in rows:
-        s = out.setdefault(r["state"], {"state": r["state"], "districts": set(), "areas": set(), "reports": 0, "households": 0.0,
-                                        "ngi": [], "silent": 0, "lat": [], "lng": [], "population": {}, "sector_ngi": {}})
+        s = out.setdefault(r[key], {"name": r[key], "state": r["state"], "districts": set(), "areas": set(), "reports": 0,
+                                    "households": 0.0, "ngi": [], "silent": 0, "lat": [], "lng": [], "population": {},
+                                    "sector_hh": {}, "sector_ngi": {}, "planned": 0.0})
         s["districts"].add(r["district"]); s["areas"].add(r["area_id"])
         s["reports"] += r["reports"]; s["households"] += r["effective_households"]
         s["ngi"].append(r["ngi"]); s["silent"] += int(r["silent_zone"])
         s["lat"].append(r["lat"]); s["lng"].append(r["lng"]); s["population"][r["area_id"]] = r["population"]
         s["sector_ngi"].setdefault(r["sector"], []).append(r["ngi"])
-        s.setdefault("sector_hh", {}).setdefault(r["sector"], 0.0)
-        s["sector_hh"][r["sector"]] += r["effective_households"] * (1 + r["deficit"])
+        s["sector_hh"][r["sector"]] = s["sector_hh"].get(r["sector"], 0.0) + r["effective_households"] * (1 + r["deficit"])
+        s["planned"] += r["planned_budget_local"]
     res = []
     for k, s in out.items():
         sec = {q: round(sum(v) / len(v), 1) for q, v in s["sector_ngi"].items()}
-        # "biggest need" = what most families ask for, weighted by how bad the infrastructure is
-        top = max(s["sector_hh"], key=s["sector_hh"].get)
         a = al.get(k, {})
-        res.append({"state": k, "districts": sorted(s["districts"]), "areas": len(s["areas"]), "reports": s["reports"],
+        res.append({"state": s["state"] if by != "state" else k, "name": k, "level": by,
+                    "district": next(iter(s["districts"])) if by != "state" else None,
+                    "districts": sorted(s["districts"]), "areas": len(s["areas"]), "reports": s["reports"],
                     "households": round(s["households"]), "population": sum(s["population"].values()),
                     "avg_ngi": round(sum(s["ngi"]) / len(s["ngi"]), 1), "max_ngi": max(s["ngi"]), "silent_zones": s["silent"],
-                    "top_sector": top, "sector_ngi": sec, "lat": round(sum(s["lat"]) / len(s["lat"]), 3),
-                    "lng": round(sum(s["lng"]) / len(s["lng"]), 3), "plan_budget": a.get("plan_budget_local", 0),
-                    "alignment_score": a.get("alignment_score")})
+                    "top_sector": max(s["sector_hh"], key=s["sector_hh"].get), "sector_ngi": sec,
+                    "lat": round(sum(s["lat"]) / len(s["lat"]), 3), "lng": round(sum(s["lng"]) / len(s["lng"]), 3),
+                    "plan_budget": a.get("plan_budget_local", s["planned"]), "alignment_score": a.get("alignment_score")})
     return sorted(res, key=lambda x: -x["avg_ngi"])

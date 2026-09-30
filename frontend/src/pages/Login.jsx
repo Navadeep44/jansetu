@@ -1,20 +1,18 @@
 import { useEffect, useState } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { AnimatePresence, motion } from 'framer-motion'
-import { Building2, Info, KeyRound, LogIn, Megaphone, Phone, ShieldCheck, UserRound } from 'lucide-react'
+import { Building2, Flag, HardHat, Info, KeyRound, Landmark, LogIn, Map as MapIcon, Megaphone, Phone, ShieldCheck, UserRound, Wrench } from 'lucide-react'
 import { api } from '../api/client'
 import { useApp } from '../context/AppContext'
 import { Card, ErrorBox, PageHead } from '../components/ui'
 import { useT } from '../i18n'
 
-const WHAT = {
-  field_officer: 'Checks unclear reports, closes work with proof',
-  district: 'Approves projects for the district',
-  state: 'Plans money and projects for the state',
-  national: 'Sees all of India, sets priorities',
-}
-const ROLE = { field_officer: 'Field officer', district: 'District collector', state: 'State planning officer', national: 'National planner', admin: 'Admin' }
-const ORDER = ['field_officer', 'district', 'state', 'national']
+import { ROLES, jurisdictionText, normRole, roleInfo } from '../lib/roles'
+
+// Lowest to highest level, so people find their own job quickly.
+const ORDER = ['field_officer', 'dept_officer', 'district_officer', 'state_officer', 'admin', 'super_admin']
+// Show one clear example per designation first (Telangana), then the others.
+const PREFERRED = ['field_utnoor', 'dept_water_tg', 'collector_adilabad', 'state_telangana', 'national_admin', 'superadmin']
 
 function CitizenLogin({ next }) {
   const { sendCitizenCode, loginCitizen } = useApp()
@@ -91,13 +89,19 @@ function OfficialLogin() {
   const [err, setErr] = useState(null)
   const [busy, setBusy] = useState(false)
   const [demo, setDemo] = useState([])
-  useEffect(() => { api.demoAccounts().then(setDemo).catch(() => {}) }, [])
+  const [showAll, setShowAll] = useState(false)
+  useEffect(() => {
+    api.demoAccounts().then((d) => setDemo(Array.isArray(d) ? d : (d?.officers || []))).catch(() => {})
+  }, [])
+  const sorted = [...demo].sort((a, b) => ORDER.indexOf(normRole(a.role)) - ORDER.indexOf(normRole(b.role)))
+  const shown = showAll ? sorted : sorted.filter((d) => PREFERRED.includes(d.username))
   const submit = async (e, user = u, pass = p) => {
     e?.preventDefault()
     setBusy(true); setErr(null)
     try { await login(user, pass) } catch (x) { setErr(x) } finally { setBusy(false) }
   }
   return (
+    <div className="stack-md">
     <div className="grid g-2" style={{ alignItems: 'start' }}>
       <Card title="Official login" sub="For government staff only">
         <form onSubmit={submit} className="stack-md">
@@ -110,28 +114,64 @@ function OfficialLogin() {
       </Card>
       <Card title="Demo accounts" sub="Tap one to log in instantly">
         <div className="stack">
-          {[...demo].sort((a, b) => ORDER.indexOf(a.role) - ORDER.indexOf(b.role)).map((d) => (
-            <motion.button key={d.username} whileHover={{ y: -2 }} whileTap={{ scale: 0.98 }} className="card role-card" style={{ textAlign: 'left', boxShadow: 'none', cursor: 'pointer' }} onClick={(e) => submit(e, d.username, d.password)}>
-              <div className="row-between"><strong>{d.name}</strong><span className="badge badge-blue">{t(ROLE[d.role] || d.role)}</span></div>
-              <div className="small">{t(WHAT[d.role] || '')}</div>
-              <div className="xs muted">{d.title}</div>
-              <div className="xs mono muted">{d.username} / {d.password}</div>
-            </motion.button>
-          ))}
+          {shown.map((d) => {
+            const ri = roleInfo(d.role)
+            return (
+              <motion.button key={d.username} whileHover={{ y: -2 }} whileTap={{ scale: 0.98 }} className="card role-card" style={{ textAlign: 'left', boxShadow: 'none', cursor: 'pointer' }} onClick={(e) => submit(e, d.username, d.password)}>
+                <div className="row-between"><strong>{d.name}</strong><span className="badge badge-blue">{t(ri?.label || d.role)}</span></div>
+                <div className="small">{t(ri?.job || '')}</div>
+                <div className="xs muted">{jurisdictionText(d, t)}</div>
+                <div className="xs mono muted">{d.username} / {d.password}</div>
+              </motion.button>
+            )
+          })}
+          {sorted.length > shown.length && <button type="button" className="btn" onClick={() => setShowAll(true)}>{t('Show all {n} demo accounts', { n: sorted.length })}</button>}
         </div>
       </Card>
+    </div>
+    <WhoLogsIn />
     </div>
   )
 }
 
+// Short explainer: the 6 designations and what each one does. Each sees only its own pages and area.
+const ROLE_ICON = { field_officer: HardHat, dept_officer: Wrench, district_officer: Landmark, state_officer: MapIcon, admin: Flag, super_admin: KeyRound }
+function WhoLogsIn() {
+  const t = useT()
+  return (
+    <Card title="Who logs in here?" sub="Each designation sees only its own work and its own area.">
+      <ul className="who-list">
+        {ORDER.map((r) => {
+          const Icon = ROLE_ICON[r] || UserRound
+          return (
+            <li key={r}>
+              <span className="who-ico" aria-hidden="true"><Icon size={18} /></span>
+              <span><strong>{t(ROLES[r].label)}</strong><span className="small muted">{t(ROLES[r].job)}</span></span>
+            </li>
+          )
+        })}
+      </ul>
+      <style>{`
+        .who-list { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+        .who-list li { display: flex; gap: 10px; align-items: flex-start; padding: 12px; border: 1px solid #e2e8f0; border-radius: 14px; }
+        .who-list li > span:last-child { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+        .who-ico { flex: none; width: 36px; height: 36px; border-radius: 10px; display: grid; place-items: center; background: #eff6ff; color: #2563eb; }
+        @media (max-width: 900px) { .who-list { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+        @media (max-width: 560px) { .who-list { grid-template-columns: 1fr; } }
+      `}</style>
+    </Card>
+  )
+}
+
 export default function Login() {
-  const { isOfficial, isCitizen } = useApp()
+  const { isOfficial, isCitizen, roleInfo: ri } = useApp()
   const nav = useNavigate()
   const t = useT()
   const [sp, setSp] = useSearchParams()
   const as = sp.get('as') === 'official' ? 'official' : sp.get('as') === 'citizen' ? 'citizen' : 'citizen'
   const next = sp.get('next')
-  useEffect(() => { if (isOfficial) nav(next || '/dashboard', { replace: true }) }, [isOfficial, nav, next])
+  // Officers land on the home page of their own job (a field officer on "My tasks", a Collector on the district dashboard).
+  useEffect(() => { if (isOfficial) nav(next || ri?.home || '/dashboard', { replace: true }) }, [isOfficial, nav, next, ri])
   useEffect(() => { if (isCitizen && as === 'citizen') nav(next || '/track', { replace: true }) }, [isCitizen, as, nav, next])
 
   return (

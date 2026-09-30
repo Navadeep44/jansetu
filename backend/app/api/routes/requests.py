@@ -44,21 +44,13 @@ def list_requests(status: str | None = None, country: str | None = None, state: 
                   limit: int = 50, offset: int = 0, claims: dict = Depends(security.require_officer), db: Session = Depends(get_db)):
     qry = db.query(CitizenRequest)
     
-    # Jurisdiction Scoping
+    # Jurisdiction scoping (field officer: only cases assigned to them; others: their state/district/department)
     actor_role = claims.get("r")
-    if actor_role not in (security.ROLE_SUPER_ADMIN, security.ROLE_ADMIN, "admin", "national"):
-        if claims.get("st") or claims.get("dist"):
-            qry = qry.join(Area, CitizenRequest.area_id == Area.id)
-            if claims.get("st"):
-                qry = qry.filter(Area.state == claims.get("st"))
-            if claims.get("dist"):
-                qry = qry.filter(Area.district == claims.get("dist"))
-        if claims.get("dept"):
-            qry = qry.filter(CitizenRequest.category == claims.get("dept"))
+    qry = security.apply_jurisdiction_scope(qry, claims, CitizenRequest, db)
 
     if status:
         qry = qry.filter(CitizenRequest.status.in_(status.split(",")))
-    if state:
+    if state and not claims.get("st") and actor_role != security.ROLE_FIELD_OFFICER:
         qry = qry.join(Area, CitizenRequest.area_id == Area.id).filter(Area.state == state)
     if area_id:
         qry = qry.filter(CitizenRequest.area_id == area_id)
@@ -80,17 +72,9 @@ def list_requests(status: str | None = None, country: str | None = None, state: 
 def review_queue(claims: dict = Depends(security.require_officer), db: Session = Depends(get_db)):
     qry = db.query(CitizenRequest).filter(or_(CitizenRequest.status == "needs_review", CitizenRequest.closure_flag == "formulaic_closure"))
     
-    # Jurisdiction Scoping
+    # Jurisdiction scoping (field officer: only cases assigned to them; others: their state/district/department)
     actor_role = claims.get("r")
-    if actor_role not in (security.ROLE_SUPER_ADMIN, security.ROLE_ADMIN, "admin", "national"):
-        if claims.get("st") or claims.get("dist"):
-            qry = qry.join(Area, CitizenRequest.area_id == Area.id)
-            if claims.get("st"):
-                qry = qry.filter(Area.state == claims.get("st"))
-            if claims.get("dist"):
-                qry = qry.filter(Area.district == claims.get("dist"))
-        if claims.get("dept"):
-            qry = qry.filter(CitizenRequest.category == claims.get("dept"))
+    qry = security.apply_jurisdiction_scope(qry, claims, CitizenRequest, db)
 
     reqs = qry.order_by(CitizenRequest.severity.desc(), CitizenRequest.created_at.desc()).limit(200).all()
     

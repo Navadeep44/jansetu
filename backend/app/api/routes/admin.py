@@ -32,6 +32,7 @@ class CreateOfficerIn(BaseModel):
     country_code: str = "IN"
     state: Optional[str] = None
     district: Optional[str] = None
+    block: Optional[str] = None
     department: Optional[str] = None
 
 
@@ -41,6 +42,7 @@ class UpdateOfficerIn(BaseModel):
     role: Optional[str] = None
     state: Optional[str] = None
     district: Optional[str] = None
+    block: Optional[str] = None
     department: Optional[str] = None
     is_active: Optional[bool] = None
     password: Optional[str] = None
@@ -121,6 +123,7 @@ def create_officer(
         country_code=body.country_code or "IN",
         state=body.state,
         district=body.district,
+        block=body.block,
         department=body.department,
         is_active=True,
     )
@@ -171,6 +174,8 @@ def update_officer(
         u.state = body.state
     if body.district is not None:
         u.district = body.district
+    if body.block is not None:
+        u.block = body.block
     if body.department is not None:
         u.department = body.department
     if body.is_active is not None:

@@ -14,7 +14,7 @@ GOV = {}  # filled after login
 
 @pytest.fixture(scope="session", autouse=True)
 def setup_gov_auth(client):
-    tok = client.post("/api/auth/login", json={"username": "planner", "password": "planner123"}).json()["token"]
+    tok = client.post("/api/auth/login", json={"username": "national_admin", "password": "admin123"}).json()["token"]
     GOV["Authorization"] = f"Bearer {tok}"
 
 
@@ -83,7 +83,7 @@ def test_projects_explain_decide_optimise(client):
     assert ok["project"]["status"] == "approved"
     denied = client.post(f"/api/projects/{recs[1]['id']}/decision", json={"decision": "approve"})
     assert denied.status_code == 401  # citizens (no login) cannot decide
-    opt = client.post("/api/projects/optimise", json={"budget": 5e8}).json()
+    opt = client.post("/api/projects/optimise", json={"budget": 5e8}, headers=GOV).json()
     assert opt["total_cost"] <= 5e8 and opt["selected"]
 
 
@@ -103,11 +103,11 @@ def test_tracking_verification_and_closure_audit(client):
 
 
 def test_nl_query_and_brief(client):
-    q = client.post("/api/query", json={"question": "Show silent zones in India"}).json()
+    q = client.post("/api/query", json={"question": "Show silent zones in India"}, headers=GOV).json()
     assert q["intent"]["intent"] == "silent_zones" and q["rows"]
-    q2 = client.post("/api/query", json={"question": "सबसे ज़्यादा पानी की समस्या कहाँ है?"}).json()
+    q2 = client.post("/api/query", json={"question": "सबसे ज़्यादा पानी की समस्या कहाँ है?"}, headers=GOV).json()
     assert q2["intent"]["sector"] == "water"
-    b = client.get("/api/briefs?state=Odisha&district=Koraput").json()
+    b = client.get("/api/briefs?state=Odisha&district=Koraput", headers=GOV).json()
     assert b["top_needs"] and b["key_findings"]
 
 
@@ -116,10 +116,10 @@ def test_impact_and_gram_sabha_plan(client):
     assert imp and all(i["did_estimate"] < 0 for i in imp)
     k = client.get("/api/impact/kpis").json()
     assert k["inclusion"]["voice_share"] > 0
-    gp = client.get("/api/plans/gram-sabha?district=Adilabad").json()
+    gp = client.get("/api/plans/gram-sabha?district=Adilabad", headers=GOV).json()
     assert gp["items"] and gp["items"][0]["priority"] == 1 and gp["items"][0]["estimated_cost_inr"] > 0
     assert client.get("/api/plans/gram-sabha.csv?district=Gaya").text.startswith("priority,area")
-    q = client.post("/api/query", json={"question": "తెలంగాణలో నీటి సమస్య ఎక్కడ ఎక్కువ?"}).json()
+    q = client.post("/api/query", json={"question": "తెలంగాణలో నీటి సమస్య ఎక్కడ ఎక్కువ?"}, headers=GOV).json()
     assert q["intent"]["state"] == "Telangana" and q["intent"]["sector"] == "water"
 
 

@@ -1,25 +1,30 @@
-import { CheckCircle2, Clock, Mic, RotateCcw, ShieldAlert, Star, UserRound, Users } from 'lucide-react'
+import { CheckCircle2, Clock, Ear, Languages, Mic, RotateCcw, ShieldAlert, Star, UserRound, Users } from 'lucide-react'
 import { api } from '../../api/client'
-import { useApp } from '../../context/AppContext'
+import { AreaLine, placeName, useLevel } from './levelScope'
 import { useT } from '../../i18n'
 import { useAsync } from '../../lib/useAsync'
 import { BeforeAfter, HBar, useMonthLabel } from '../../components/charts/Charts'
 import { Card, ListenButton, Loading, PageHead, SectorTag, Stat } from '../../components/ui'
-import { LANG_NAMES, fmt, money, pct } from '../../lib/format'
+import { CHANNEL_LABEL, LANG_NAMES, fmt, money, pct } from '../../lib/format'
 
 export default function Impact() {
-  const { stateParam } = useApp()
+  const { level, scoped, state: stateParam, district } = useLevel()
   const t = useT()
   const ml = useMonthLabel()
-  const imp = useAsync(() => api.impactProjects(stateParam), [stateParam])
-  const k = useAsync(() => api.kpis(), [])
-  const d = k.data
+  const place = placeName(t, { state: stateParam, district })
+  const imp = useAsync(() => api.get('/api/impact/projects', { state: stateParam, district }), [stateParam, district])
+  // The India-wide KPI endpoint is not split by area, so officers of a state or district see their own numbers instead.
+  const k = useAsync(() => (scoped ? Promise.resolve(null) : api.kpis()), [scoped])
+  const ov = useAsync(() => (scoped ? api.get('/api/analytics/overview', { state: stateParam, district }) : Promise.resolve(null)), [scoped, stateParam, district])
+  const d = k.data, o = ov.data
+  const channels = o ? Object.entries(o.channels || {}).map(([c, v]) => ({ name: CHANNEL_LABEL[c] || c, value: v })).sort((a, b) => b.value - a.value) : []
   const langs = d ? Object.entries(d.language_mix).map(([l, v]) => ({ name: LANG_NAMES[l] || l, value: v })) : []
   return (
     <div className="stack-md">
       <PageHead title="Results & impact" eyebrow="Official workspace" overlap={false} steps={['See finished work', 'Compare before and after', 'Check who is not being heard']}>
         Did the work solve the problem? And is everyone being heard?
       </PageHead>
+      <AreaLine place={place} />
       <h2>{t('Finished works')}</h2>
       {imp.loading ? <Loading height={300} /> : !imp.data?.length ? <Card><p className="muted">{t('No finished works here yet.')}</p></Card> : (
         <div className="grid g-2">
@@ -28,7 +33,7 @@ export default function Impact() {
             const fell = Math.round(p.reduction_pct)
             const line = t('Complaints fell by {p}%', { p: fell })
             return (
-              <Card key={p.project_id} title={<>{p.title}</>} sub={<>{p.area}, {t(p.state)} · {money(p.cost_local)} · {t('{n} people helped', { n: fmt(p.beneficiaries) })}</>} actions={<SectorTag sector={p.sector} short />}>
+              <Card key={p.project_id} title={<>{p.title}</>} sub={<>{p.area}, {t(level === 'nation' ? p.state : p.district)} · {money(p.cost_local)} · {t('{n} people helped', { n: fmt(p.beneficiaries) })}</>} actions={<SectorTag sector={p.sector} short />}>
                 <div className="alert alert-success" style={{ marginBottom: 12 }}><CheckCircle2 size={18} aria-hidden="true" />
                   <div style={{ flex: 1 }}><strong style={{ fontSize: '1.15rem' }}>{line}</strong>
                     <div className="small">{t('Service went from {a} to {b}.', { a: pct(p.indicator.before), b: pct(p.indicator.after) })}</div></div>
@@ -44,7 +49,17 @@ export default function Impact() {
         </div>
       )}
       <h2 className="mt">{t('Is everyone being heard?')}</h2>
-      {!d ? <Loading height={200} /> : (
+      {scoped ? (!o ? <Loading height={200} /> : (
+        <>
+          <div className="grid g-4">
+            <Stat tone="blue" icon={Ear} label="Reports" value={fmt(o.total_requests)} note={<>{t('from {n} families', { n: fmt(o.unique_households) })}</>} />
+            <Stat tone="blue" icon={Mic} label="By voice call" value={pct(o.voice_share)} note="For basic phones and people who cannot read" />
+            <Stat tone="green" icon={Languages} label="Languages heard" value={fmt(o.languages)} />
+            <Stat tone="red" icon={RotateCcw} label="Reopened by citizens" value={fmt(o.status?.reopened || 0)} note="They said it was not fixed" />
+          </div>
+          <Card title="How people reached us" sub={<>{place}</>}><HBar data={channels} dataKey="value" format={(v) => fmt(v)} /></Card>
+        </>
+      )) : !d ? <Loading height={200} /> : (
         <>
           <div className="grid g-4">
             <Stat tone="blue" icon={Mic} label="By voice call" value={pct(d.inclusion.voice_share)} note="For basic phones and people who cannot read" />

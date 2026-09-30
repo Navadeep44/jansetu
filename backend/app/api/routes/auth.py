@@ -336,7 +336,7 @@ def get_roles_and_jurisdictions(db: Session = Depends(get_db)):
         {
             "role": security.ROLE_ADMIN,
             "label": "National Admin / Planner",
-            "description": "National level planning, cross-state policy briefs, budget optimizer, and BRICS analytics.",
+            "description": "National level planning, cross-state policy briefs, and the national budget optimizer.",
             "requires_state": False,
             "requires_district": False,
             "requires_department": False,
@@ -389,3 +389,59 @@ def get_roles_and_jurisdictions(db: Session = Depends(get_db)):
         "states_and_districts": states_tree,
         "departments": departments,
     }
+
+
+# ---------------------------------------------------------------------------
+# Citizen phone + one-time code login (optional; reporting never needs it)
+# ---------------------------------------------------------------------------
+import random as _random  # noqa: E402
+
+from app.core.config import settings as _settings  # noqa: E402
+
+_OTPS: dict[str, tuple[str, float]] = {}
+
+
+class SendCodeIn(BaseModel):
+    phone: str
+
+
+class VerifyCodeIn(BaseModel):
+    phone: str
+    code: str
+
+
+def _norm_phone(p: str) -> str:
+    digits = "".join(ch for ch in (p or "") if ch.isdigit())
+    return digits[-10:]
+
+
+@router.post("/citizen/send-code")
+def citizen_send_code(body: SendCodeIn):
+    ph = _norm_phone(body.phone)
+    if len(ph) < 8:
+        raise HTTPException(400, "Enter a valid phone number.")
+    code = f"{_random.randint(0, 999999):06d}"
+    _OTPS[ph] = (code, datetime.utcnow().timestamp() + 300)
+    # In production this goes out by SMS; the demo shows it on screen.
+    return {"sent": True, "expires_in": 300,
+            "demo_code": code if _settings.environment != "production" else None}
+
+
+@router.post("/citizen/verify")
+def citizen_verify(body: VerifyCodeIn, db: Session = Depends(get_db)):
+    ph = _norm_phone(body.phone)
+    rec = _OTPS.get(ph)
+    if not rec or rec[1] < datetime.utcnow().timestamp() or rec[0] != body.code.strip():
+        raise HTTPException(401, "Wrong or expired code. Please ask for a new one.")
+    _OTPS.pop(ph, None)
+    u = db.query(User).filter(User.phone.like(f"%{ph[-10:]}")).first() if hasattr(User, "phone") else None
+    if not u:
+        u = User(username=f"citizen_{ph}", password_hash=security.hash_password(_random.randbytes(8).hex()),
+                 phone=body.phone.strip(), name=f"Citizen ••{ph[-4:]}", title="Citizen", user_type="citizen",
+                 role=security.ROLE_CITIZEN, country_code="IN", is_active=True)
+        db.add(u)
+        db.commit()
+        db.refresh(u)
+    token = security.issue_token(user_id=u.id, username=u.username, user_type="citizen", role=security.ROLE_CITIZEN,
+                                 name=u.name, title="Citizen", country_code="IN", state=u.state, district=u.district)
+    return {"token": token, "user": {**u.to_dict(), "role": security.ROLE_CITIZEN, "name": u.name}}

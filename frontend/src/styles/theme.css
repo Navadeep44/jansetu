@@ -222,3 +222,5 @@ body { background: #f8fafc; }
 
 .an-mlang { display: none; }
 @media (max-width: 760px) { .an-mlang { display: block; margin-left: auto; } .an-mlang + .an-burger { margin-left: 4px; } .an-mlang .lang-switch button { min-width: 38px; padding: 0 8px; } }
+.an-juris { display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px; border-radius: 999px; font-size: 0.84rem; font-weight: 600; white-space: nowrap; background: rgba(251,191,36,0.14); border: 1px solid rgba(251,191,36,0.4); color: #fde68a; max-width: 42vw; overflow: hidden; text-overflow: ellipsis; }
+.an.solid .an-juris { background: #fef3c7; color: #92400e; border-color: #fcd34d; }
