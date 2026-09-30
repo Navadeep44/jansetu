@@ -16,15 +16,10 @@ export const COUNTRIES = { IN: 'India', BR: 'Brazil', ZA: 'South Africa', RU: 'R
 export const CURRENCY = { IN: 'INR', BR: 'BRL', ZA: 'ZAR' }
 
 export const LANG_NAMES = {
-  en: 'English', hi: 'Hindi (हिन्दी)', te: 'Telugu (తెలుగు)', ta: 'Tamil (தமிழ்)', bn: 'Bengali (বাংলা)',
-  mr: 'Marathi (मराठी)', gu: 'Gujarati (ગુજરાતી)', kn: 'Kannada (ಕನ್ನಡ)', ml: 'Malayalam (മലയാളം)',
-  pa: 'Punjabi (ਪੰਜਾਬੀ)', or: 'Odia (ଓଡ଼ିଆ)', bho: 'Bhojpuri (भोजपुरी)', gon: 'Gondi',
+  en: 'English', hi: 'Hindi', bho: 'Bhojpuri', te: 'Telugu', or: 'Odia', ta: 'Tamil', bn: 'Bengali', pt: 'Portuguese',
+  zu: 'isiZulu', xh: 'isiXhosa', af: 'Afrikaans', ru: 'Russian', zh: 'Chinese', ar: 'Arabic', am: 'Amharic', fa: 'Persian', id: 'Indonesian', gon: 'Gondi',
 }
-export const SPEECH_TAGS = {
-  en: 'en-IN', hi: 'hi-IN', te: 'te-IN', ta: 'ta-IN', bn: 'bn-IN',
-  mr: 'mr-IN', gu: 'gu-IN', kn: 'kn-IN', ml: 'ml-IN', pa: 'pa-IN',
-  or: 'or-IN', bho: 'hi-IN', gon: 'hi-IN',
-}
+export const SPEECH_TAGS = { en: 'en-IN', hi: 'hi-IN', bho: 'hi-IN', te: 'te-IN', or: 'or-IN', ta: 'ta-IN', bn: 'bn-IN', pt: 'pt-BR', zu: 'zu-ZA', xh: 'xh-ZA', af: 'af-ZA', ru: 'ru-RU', zh: 'zh-CN', ar: 'ar-EG' }
 
 const nf = new Intl.NumberFormat('en-IN')
 export const fmt = (n, d = 0) => (n === null || n === undefined || Number.isNaN(n) ? '–' : Number(n).toLocaleString('en-IN', { maximumFractionDigits: d, minimumFractionDigits: 0 }))
@@ -50,7 +45,6 @@ export const money = (amount, country) => {
   if (amount >= 1e3) return `${sym}${(amount / 1e3).toFixed(0)}k`
   return `${sym}${nf.format(amount)}`
 }
-export const inr = (n) => money(n, 'IN')
 export const usd = (n) => money(n, 'USD')
 export const date = (iso) => (iso ? new Date(iso.endsWith('Z') ? iso : iso + 'Z').toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : '–')
 export const ago = (iso) => {
@@ -63,44 +57,13 @@ export const ago = (iso) => {
 }
 export const ngiColor = (v) => (v >= 75 ? '#7f1d1d' : v >= 62 ? '#dc2626' : v >= 50 ? '#f59e0b' : v >= 38 ? '#fcd34d' : '#fef3c7')
 export const STATUS_LABEL = {
-  received: '1. Received',
-  needs_review: 'Under Review',
-  assigned: '2. Assigned to Officer',
-  clustered: 'In Demand Cluster',
-  in_plan: 'Included in Scheme',
-  in_progress: '3. Work In Progress',
-  resolved_pending_verification: '4. Resolved (Pending Confirmation)',
-  closed_verified: '5. Closed (Confirmed)',
-  closed: '5. Closed (Confirmed)',
-  reopened: 'Reopened (Disputed)',
-  recommended: 'Awaiting Decision',
-  approved: 'Approved',
-  deferred: 'Deferred',
-  rejected: 'Rejected',
-  completed: 'Completed',
-  planned: 'Planned',
-  sanctioned: 'Sanctioned',
-  open: 'Open',
-  resolved: 'Resolved',
+  received: 'Received', needs_review: 'Needs review', clustered: 'In demand cluster', in_plan: 'In plan', in_progress: 'Work in progress',
+  resolved_pending_verification: 'Awaiting citizen check', closed: 'Closed (verified)', reopened: 'Reopened',
+  recommended: 'Awaiting decision', approved: 'Approved', deferred: 'Deferred', rejected: 'Rejected', completed: 'Completed', planned: 'Planned', sanctioned: 'Sanctioned',
+  open: 'Open', resolved: 'Resolved',
 }
 export const STATUS_TONE = {
-  received: 'blue',
-  needs_review: 'amber',
-  assigned: 'blue',
-  clustered: 'blue',
-  in_plan: 'blue',
-  in_progress: 'blue',
-  resolved_pending_verification: 'amber',
-  closed_verified: 'green',
-  closed: 'green',
-  reopened: 'red',
-  completed: 'green',
-  approved: 'green',
-  rejected: 'red',
-  deferred: 'amber',
-  recommended: 'amber',
-  sanctioned: 'blue',
-  planned: '',
-  resolved: 'green',
+  needs_review: 'amber', reopened: 'red', closed: 'green', completed: 'green', approved: 'green', in_progress: 'blue', in_plan: 'blue',
+  resolved_pending_verification: 'amber', rejected: 'red', deferred: 'amber', recommended: 'amber', sanctioned: 'blue', planned: '', clustered: 'blue', resolved: 'green',
 }
 export const CHANNEL_LABEL = { whatsapp: 'WhatsApp', telegram: 'Telegram', ivr: 'IVR voice call', sms: 'SMS', web: 'Web / app', assisted: 'Assisted (CSC/ASHA)', community: 'Community meeting', import: 'Portal import', simulator: 'Simulator' }

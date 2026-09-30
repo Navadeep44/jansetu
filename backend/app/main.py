@@ -7,10 +7,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
-from app.api.routes import (
-    admin, analytics, auth, channels, clusters, connectors,
-    governance, insights, intake, meta, officer, open311, projects, public, requests
-)
+from app.api.routes import analytics, channels, clusters, connectors, insights, intake, meta, open311, projects, public, requests
 from app.core.config import settings
 from app.core.database import SessionLocal, init_db
 from app.models import Area
@@ -44,7 +41,7 @@ app = FastAPI(
 app.add_middleware(CORSMiddleware, allow_origins=[o.strip() for o in settings.cors_origins.split(",")] + ["*"],
                    allow_credentials=False, allow_methods=["*"], allow_headers=["*"])
 
-for r in (auth, admin, officer, governance, meta, public, intake, requests, clusters, analytics, projects, insights, connectors, channels):
+for r in (meta, public, intake, requests, clusters, analytics, projects, insights, connectors, channels):
     app.include_router(r.router, prefix="/api")
 app.include_router(open311.router)
 

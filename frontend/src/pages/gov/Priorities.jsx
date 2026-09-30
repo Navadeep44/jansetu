@@ -16,7 +16,7 @@ const LABELS = {
 }
 
 export default function Priorities() {
-  const { countryParam, t } = useApp()
+  const { countryParam } = useApp()
   const [tab, setTab] = useState('ngi')
   const [w, setW] = useState(DEFAULTS)
   const [dw, setDw] = useState(DEFAULTS)
@@ -28,18 +28,18 @@ export default function Priorities() {
 
   return (
     <div className="stack-md">
-      <PageHead title={t('priorities_title', 'Priority ranking')} actions={<a className="btn btn-sm" href={api.exportUrl(countryParam)} download><Download size={16} aria-hidden="true" />{t('download_csv', 'Download CSV')}</a>}>{t('priorities_subtitle', 'Which places need help most. Move the sliders to change what matters.')}</PageHead>
-      <Tabs value={tab} onChange={setTab} tabs={[{ value: 'ngi', label: t('tab_ranking', 'Ranking') }, { value: 'silent', label: `${t('tab_silent', 'Silent areas')} (${silent.data?.length ?? '…'})` }]} />
+      <PageHead title="Priority ranking" actions={<a className="btn btn-sm" href={api.exportUrl(countryParam)} download><Download size={16} aria-hidden="true" />Download CSV</a>}>Which places need help most. Move the sliders to change what matters.</PageHead>
+      <Tabs value={tab} onChange={setTab} tabs={[{ value: 'ngi', label: 'Ranking' }, { value: 'silent', label: `Silent areas (${silent.data?.length ?? '…'})` }]} />
       {tab === 'ngi' ? (
         <div className="grid g-main" style={{ gridTemplateColumns: 'minmax(0, 2fr) minmax(280px, 1fr)' }}>
-          <Card title={t('tab_ranking', 'Ranking')} sub="Updates as you move the sliders" actions={
+          <Card title="Ranking" sub="Updates as you move the sliders" actions={
             <select className="select" style={{ width: 'auto', minHeight: 36 }} value={sector} onChange={(e) => setSector(e.target.value)} aria-label="Sector">
-              <option value="all">{t('all_sectors', 'All sectors')}</option>{SECTOR_KEYS.map((s) => <option key={s} value={s}>{SECTORS[s].label}</option>)}</select>}>
+              <option value="all">All sectors</option>{SECTOR_KEYS.map((s) => <option key={s} value={s}>{SECTORS[s].label}</option>)}</select>}>
             <ErrorBox error={ng.error} />
             {!ng.data ? <Loading height={400} /> : (
               <div className="table-wrap"><table className="table">
-                <thead><tr><th>#</th><th>{t('th_area', 'Area')}</th><th>{t('th_sector', 'Sector')}</th><th className="num">{t('th_families', 'Families')}</th><th className="num">{t('th_missing', 'Missing')}</th><th>{t('th_need_level', 'Need level')}</th></tr></thead>
-                <tbody>{(ng.data?.items || []).map((r, i) => (
+                <thead><tr><th>#</th><th>Area</th><th>Sector</th><th className="num">Families</th><th className="num">Missing</th><th>Need level</th></tr></thead>
+                <tbody>{ng.data.items.map((r, i) => (
                   <tr key={`${r.area_id}-${r.sector}`}>
                     <td className="mono muted">{i + 1}</td>
                     <td><strong>{r.area}</strong><div className="xs muted">{r.district}, {r.country}</div>
@@ -52,7 +52,7 @@ export default function Priorities() {
             )}
           </Card>
           <div className="stack-md">
-            <Card title={t('what_matters_most', 'What matters most?')} sub={t('policy_choice', 'Your policy choice')} actions={<button className="btn btn-sm" onClick={() => setW(DEFAULTS)}><RotateCcw size={14} aria-hidden="true" />{t('reset', 'Reset')}</button>}>
+            <Card title="What matters most?" sub="Your policy choice" actions={<button className="btn btn-sm" onClick={() => setW(DEFAULTS)}><RotateCcw size={14} aria-hidden="true" />Reset</button>}>
               <div className="stack-md">
                 {Object.keys(DEFAULTS).map((k) => (
                   <div key={k} className="field">
@@ -75,14 +75,14 @@ export default function Priorities() {
             <div><strong>Silent areas</strong> badly lack services, but almost nobody has reported. Usually people have no phone or no way to be heard. Send someone to listen.</div></div>
           {silent.loading ? <Loading height={300} /> : (
             <div className="grid g-2">
-              {(silent.data || []).map((r) => (
+              {silent.data.map((r) => (
                 <Card key={`${r.area_id}-${r.sector}`} className="highlight" title={r.area} sub={`${r.district}, ${r.state} · ${r.country}`} actions={<SectorTag sector={r.sector} short />}>
                   <dl className="kv">
                     <dt>Services available</dt><dd className="mono">{pct(1 - r.deficit)}</dd>
                     <dt>Vulnerability</dt><dd className="mono">{r.vulnerability.toFixed(2)}</dd>
                     <dt>Phone / internet access</dt><dd className="mono">{pct(r.connectivity)}</dd>
                     <dt>Reports received</dt><dd className="mono">{r.reports} (bottom {Math.round(r.raw_demand_pct * 100) || 1}% nationally)</dd>
-                    <dt>{t('th_need_level', 'Need level')}</dt><dd><NgiBar value={r.ngi} /></dd>
+                    <dt>Need level</dt><dd><NgiBar value={r.ngi} /></dd>
                   </dl>
                   <p className="small mt"><strong>What to do:</strong> {r.recommended_outreach}</p>
                 </Card>

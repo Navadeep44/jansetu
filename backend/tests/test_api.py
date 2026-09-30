@@ -12,10 +12,13 @@ from app.seed.seed import run as seed  # noqa: E402
 GOV = {}  # filled after login
 
 
-@pytest.fixture(scope="session", autouse=True)
-def setup_gov_auth(client):
-    tok = client.post("/api/auth/login", json={"username": "planner", "password": "planner123"}).json()["token"]
-    GOV["Authorization"] = f"Bearer {tok}"
+@pytest.fixture(scope="session")
+def client():
+    seed()
+    with TestClient(app) as c:
+        tok = c.post("/api/auth/login", json={"username": "planner", "password": "planner123"}).json()["token"]
+        GOV["Authorization"] = f"Bearer {tok}"
+        yield c
 
 
 def test_health_and_meta(client):
@@ -175,3 +178,15 @@ def test_citizen_can_answer_where(client):
     assert "citizen_reply" in kinds and kinds[-1] == "ack"
     extra = client.post(f"/api/track/{tid}/reply", json={"text": "It is near the school"}).json()
     assert extra["resolved"]
+
+
+def test_citizen_otp_login(client):
+    sent = client.post("/api/auth/citizen/send-code", json={"phone": "+91 90000 22222"}).json()
+    assert sent["sent"] and len(sent["demo_code"]) == 6
+    assert client.post("/api/auth/citizen/verify", json={"phone": "+91 90000 22222", "code": "000000x"}).status_code == 401
+    tok = client.post("/api/auth/citizen/verify", json={"phone": "919000022222", "code": sent["demo_code"]}).json()["token"]
+    h = {"Authorization": f"Bearer {tok}"}
+    client.post("/api/intake/text", json={"text": "No water in Utnoor for a week", "phone": "+91 90000 22222"})
+    mine = client.get("/api/citizen/me/requests", headers=h).json()
+    assert mine and mine[0]["area"] == "Utnoor"
+    assert client.get("/api/review-queue", headers=h).status_code == 401  # a citizen token is not an official token

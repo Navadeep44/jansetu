@@ -44,7 +44,8 @@ no system does is the next layer, and that is what JanSetu builds:
 
 ## Who logs in?
 
-- **Citizens never log in.** They can report a problem (even anonymously or on a shared phone), say **Me too** to a problem already reported nearby, track requests by ID or phone number, confirm fixes, and see the **Public results** board.
+- **Citizens never have to log in.** They can report a problem (even anonymously or on a shared phone), say **Me too** to a problem already reported nearby, track requests by ID or phone number, confirm fixes, and see the **Public results** board.
+- **Optional citizen login** (phone number + one-time code) shows all of a citizen's requests in one place. In demo mode the code is shown on screen; in production it goes by SMS.
 - **Officials log in** to reach the inbox, dashboard, ranking, projects, questions and impact pages. Demo accounts (also shown on the login page):
 
 | Username / password | Role |
@@ -55,6 +56,10 @@ no system does is the next layer, and that is what JanSetu builds:
 | `brics` / `brics123` | BRICS analyst |
 
 Tokens are HMAC-signed and expire after 12 hours. In production, swap the login function for the government's single sign-on.
+
+## Home page
+
+`/` is an animated landing page: a 3D BRICS globe (React Three Fiber), GSAP scroll reveals and live counters, and Framer Motion navbar, filters and tilt cards. The navbar has separate **Citizen login** and **Official login** buttons, and the page lists all 16 services with who can use each one. The short card guide is at `/overview`. All animation respects the system "reduce motion" setting.
 
 ## Quick start (about 3 minutes)
 
@@ -78,7 +83,7 @@ Or use the helper script: `./start.sh` (macOS / Linux). Or run `docker compose u
 
 - API docs (Swagger): http://localhost:8000/docs
 - Reset the demo data: `cd backend && python -m app.seed.seed`
-- Run the tests: `cd backend && pytest -q` (17 end-to-end tests)
+- Run the tests: `cd backend && pytest -q` (19 end-to-end tests)
 
 ## Turning on real AI and channels (optional)
 

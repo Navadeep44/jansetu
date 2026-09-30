@@ -1,6 +1,5 @@
 import { AlertTriangle, Loader2 } from 'lucide-react'
 import { SECTORS, STATUS_LABEL, STATUS_TONE, ngiColor } from '../../lib/format'
-import { useApp } from '../../context/AppContext'
 
 export function Card({ title, sub, actions, children, className = '', ...rest }) {
   return (
@@ -110,44 +109,11 @@ export const COLOR_MEANING = [
 ]
 
 export function ColorGuide({ compact = false }) {
-  const { t } = useApp()
-  const items = [
-    { tone: 'blue', label: t('color_blue_label', 'Blue'), meaning: t('color_blue_meaning', 'Action or in progress') },
-    { tone: 'green', label: t('color_green_label', 'Green'), meaning: t('color_green_meaning', 'Done or confirmed') },
-    { tone: 'amber', label: t('color_amber_label', 'Amber'), meaning: t('color_amber_meaning', 'Needs attention or a decision') },
-    { tone: 'red', label: t('color_red_label', 'Red'), meaning: t('color_red_meaning', 'Urgent or very high need') },
-    { tone: 'violet', label: t('color_violet_label', 'Purple'), meaning: t('color_violet_meaning', 'Silent area: high need, few voices') },
-  ]
   return (
     <ul className={`color-guide ${compact ? 'compact' : ''}`}>
-      {items.map((c) => (
+      {COLOR_MEANING.map((c) => (
         <li key={c.tone}><span className={`badge badge-${c.tone}`}>{c.label}</span><span className="small">{c.meaning}</span></li>
       ))}
     </ul>
   )
 }
-
-export function Modal({ isOpen, onClose, title, children, maxWidth = 600 }) {
-  if (!isOpen) return null
-  return (
-    <div className="modal-backdrop" style={{
-      position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
-      background: 'rgba(15, 23, 42, 0.65)', backdropFilter: 'blur(4px)',
-      display: 'flex', alignItems: 'center', justifyContent: 'center',
-      zIndex: 9999, padding: 16
-    }} onClick={onClose} role="dialog" aria-modal="true">
-      <div className="modal-card card" style={{
-        maxWidth, width: '100%', maxHeight: '90vh', overflowY: 'auto',
-        background: '#fff', borderRadius: 12, padding: 24, boxShadow: '0 20px 25px -5px rgba(0,0,0,0.1)'
-      }} onClick={(e) => e.stopPropagation()}>
-        <div className="row-between" style={{ marginBottom: 16, borderBottom: '1px solid #e2e8f0', paddingBottom: 12 }}>
-          <h3 style={{ margin: 0, fontSize: '1.2rem', fontWeight: 600 }}>{title}</h3>
-          <button className="btn btn-sm" onClick={onClose} style={{ border: 'none', background: '#f1f5f9', borderRadius: '50%', width: 32, height: 32, padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}>✕</button>
-        </div>
-        {children}
-      </div>
-    </div>
-  )
-}
-
-

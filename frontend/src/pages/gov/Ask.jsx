@@ -5,13 +5,13 @@ import { api } from '../../api/client'
 import { useApp } from '../../context/AppContext'
 import DemandMap from '../../components/map/DemandMap'
 import { Badge, Card, ErrorBox, PageHead, SectorTag } from '../../components/ui'
-import { COUNTRIES, SPEECH_TAGS } from '../../lib/format'
+import { COUNTRIES } from '../../lib/format'
 
 const EXAMPLES = [
   'Which districts in Odisha have the highest unmet drinking water demand and no works planned?',
   'Show silent zones in India',
   'सबसे ज़्यादा पानी की समस्या कहाँ है?',
-  'ఆదిలాబాద్ లో రోడ్డు సమస్యలు ఎక్కడ ఉన్నాయి?',
+  'Onde o gasto está desalinhado no Brazil?',
   'Any sudden spikes or outbreak risks this week?',
   'Where are the road hotspots in Adilabad?',
   'Did the completed projects work?',
@@ -26,7 +26,7 @@ const cell = (k, v) => {
 }
 
 export default function Ask() {
-  const { country, uiLang, t } = useApp()
+  const { country } = useApp()
   const [q, setQ] = useState('')
   const [res, setRes] = useState(null)
   const [busy, setBusy] = useState(false)
@@ -41,24 +41,21 @@ export default function Ask() {
   const voice = () => {
     const SR = window.SpeechRecognition || window.webkitSpeechRecognition
     if (!SR) return
-    const r = new SR()
-    r.lang = SPEECH_TAGS[uiLang] || 'en-IN'
-    r.onresult = (e) => ask(e.results[0][0].transcript)
-    r.onend = () => setListening(false)
+    const r = new SR(); r.lang = 'en-IN'; r.onresult = (e) => ask(e.results[0][0].transcript); r.onend = () => setListening(false)
     setListening(true); r.start()
   }
   const points = res?.rows?.filter((r) => r.lat && r.lng).map((r, i) => ({ area_id: r.area_id || i, area: r.area, district: r.district, lat: r.lat, lng: r.lng, population: 100000, ngi_max: r.ngi ?? 70, hotspot: { z: r.gi_z ?? '', class: '' }, sectors: {}, silent_zone: !!r.silent_score, silent_sectors: r.sector ? [r.sector] : [] }))
   return (
     <div className="stack-md">
-      <PageHead title={t('ask_title', 'Ask a question')} actions={<Link className="btn" to={`/brief?country=${country === 'all' ? 'IN' : country}`}><FileText size={16} aria-hidden="true" />{t('generate_brief', 'Generate policy brief')}</Link>}>
-        {t('ask_subtitle', 'Type or speak a question in any language.')}
+      <PageHead title="Ask a question" actions={<Link className="btn" to={`/brief?country=${country === 'all' ? 'IN' : country}`}><FileText size={16} aria-hidden="true" />Generate policy brief</Link>}>
+        Type or speak a question in any language.
       </PageHead>
       <Card>
         <form className="row" onSubmit={(e) => { e.preventDefault(); ask() }}>
-          <label htmlFor="q" className="sr-only">{t('ask_title', 'Question')}</label>
-          <input id="q" className="input" style={{ flex: 1, minWidth: 260, fontSize: '1.05rem' }} value={q} onChange={(e) => setQ(e.target.value)} placeholder={t('ask_placeholder', 'e.g. Which areas need drinking water most and have nothing planned?')} />
-          <button type="button" className={`btn btn-icon ${listening ? 'highlight' : ''}`} onClick={voice} aria-label={t('ask_by_voice', 'Ask by voice')} aria-pressed={listening}><Mic size={18} /></button>
-          <button className="btn btn-primary" disabled={busy}><Sparkles size={16} aria-hidden="true" />{busy ? t('thinking', 'Thinking…') : t('ask_btn', 'Ask')}</button>
+          <label htmlFor="q" className="sr-only">Question</label>
+          <input id="q" className="input" style={{ flex: 1, minWidth: 260, fontSize: '1.05rem' }} value={q} onChange={(e) => setQ(e.target.value)} placeholder="e.g. Which areas need drinking water most and have nothing planned?" />
+          <button type="button" className="btn btn-icon" onClick={voice} aria-label="Ask by voice" aria-pressed={listening}><Mic size={18} /></button>
+          <button className="btn btn-primary" disabled={busy}><Sparkles size={16} aria-hidden="true" />{busy ? 'Thinking…' : 'Ask'}</button>
         </form>
         <div className="row mt">{EXAMPLES.map((e) => <button key={e} className="btn btn-sm" onClick={() => ask(e)}>{e}</button>)}</div>
       </Card>
@@ -72,8 +69,8 @@ export default function Ask() {
           <div className="grid g-main">
             <Card title="Results">
               <div className="table-wrap"><table className="table">
-                <thead><tr>{(res.columns || []).map((c) => <th key={c}>{c.replace(/_/g, ' ')}</th>)}</tr></thead>
-                <tbody>{(res.rows || []).map((r, i) => <tr key={i}>{(res.columns || []).map((c) => <td key={c} className={typeof r[c] === 'number' ? 'num' : 'small'}>{cell(c, r[c])}</td>)}</tr>)}</tbody>
+                <thead><tr>{res.columns.map((c) => <th key={c}>{c.replace(/_/g, ' ')}</th>)}</tr></thead>
+                <tbody>{res.rows.map((r, i) => <tr key={i}>{res.columns.map((c) => <td key={c} className={typeof r[c] === 'number' ? 'num' : 'small'}>{cell(c, r[c])}</td>)}</tr>)}</tbody>
               </table></div>
             </Card>
             {points?.length > 0 && <Card title="On the map"><DemandMap areas={points} layer={res.intent.intent === 'silent_zones' ? 'silent' : 'ngi'} fit /></Card>}

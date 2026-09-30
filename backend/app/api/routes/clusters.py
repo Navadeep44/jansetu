@@ -11,19 +11,11 @@ from app.schemas.serializers import area_out, cluster_out, project_out, request_
 router = APIRouter(prefix="/clusters", tags=["demand clusters"])
 
 
-from app.core import security
-
-
 @router.get("")
 def list_clusters(country: str | None = None, category: str | None = None, area_id: int | None = None,
                   status: str | None = None, sort: str = "households", limit: int = 50, offset: int = 0,
-                  claims: dict = Depends(security.get_current_user_claims),
                   db: Session = Depends(get_db)):
     q = db.query(DemandCluster)
-    
-    # Jurisdiction Scoping
-    q = security.apply_jurisdiction_scope(q, claims, DemandCluster, db)
-
     if country:
         q = q.filter(DemandCluster.country_code == country)
     if category:

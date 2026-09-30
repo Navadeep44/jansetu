@@ -41,11 +41,11 @@ export default function Brics() {
         )}
       </Card>
       <Card title="Exchange payload" sub="Exactly what each node publishes (no rows, no PII)">
-        {loading || !data ? <Loading /> : (
+        {loading ? <Loading /> : (
           <div className="table-wrap"><table className="table">
             <thead><tr><th>Node</th><th>Status</th><th className="num">Requests</th><th className="num">Languages</th><th className="num">Alignment</th>
               {SECTOR_KEYS.map((s) => <th key={s} className="num">{SECTORS[s].short} NGI</th>)}</tr></thead>
-            <tbody>{(data || []).map((n) => (
+            <tbody>{data.map((n) => (
               <tr key={n.country}><td><strong>{n.name}</strong> <span className="mono xs muted">{n.country}</span></td>
                 <td>{n.node_status === 'live' ? <Badge tone="green">live</Badge> : <Badge>simulated</Badge>}</td>
                 <td className="num">{fmt(n.requests)}</td><td className="num">{n.languages}</td><td className="num">{n.alignment_score ?? '–'}%</td>

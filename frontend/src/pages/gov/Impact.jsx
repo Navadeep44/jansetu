@@ -7,18 +7,18 @@ import { Card, Loading, PageHead, SectorTag, Stat } from '../../components/ui'
 import { COUNTRIES, LANG_NAMES, fmt, pct, usd } from '../../lib/format'
 
 export default function Impact() {
-  const { countryParam, t } = useApp()
+  const { countryParam } = useApp()
   const imp = useAsync(() => api.impactProjects(countryParam), [countryParam])
   const k = useAsync(() => api.kpis(countryParam), [countryParam])
   const d = k.data
   const langs = d ? Object.entries(d.language_mix).map(([l, v]) => ({ name: LANG_NAMES[l] || l, value: v })) : []
   return (
     <div className="stack-md">
-      <PageHead title={t('impact_title', 'Results & impact')}>{t('impact_subtitle', 'Did the work solve the problem? And is everyone being heard?')}</PageHead>
-      <h2>{t('completed_projects', 'Completed projects')}</h2>
-      {imp.loading || !imp.data ? <Loading height={300} /> : (
+      <PageHead title="Results & impact">Did the work solve the problem? And is everyone being heard?</PageHead>
+      <h2>Completed projects</h2>
+      {imp.loading ? <Loading height={300} /> : (
         <div className="grid g-2">
-          {(imp.data || []).map((p) => {
+          {imp.data.map((p) => {
             const c = p.complaints_per_1000hh_month
             return (
               <Card key={p.project_id} title={p.title} sub={`${p.area} · ${COUNTRIES[p.country]} · ${usd(p.cost_usd)} · ${fmt(p.beneficiaries)} beneficiaries`} actions={<SectorTag sector={p.sector} short />}>
@@ -34,7 +34,7 @@ export default function Impact() {
           })}
         </div>
       )}
-      <h2 className="mt">{t('is_everyone_heard', 'Is everyone being heard?')}</h2>
+      <h2 className="mt">Is everyone being heard?</h2>
       {!d ? <Loading height={200} /> : (
         <>
           <div className="grid g-4">
@@ -48,7 +48,7 @@ export default function Impact() {
             <Stat tone="green" icon={Star} label="Average rating" value={`${d.trust.avg_rating}/5`} note={<><Clock size={12} aria-hidden="true" /> median {d.responsiveness.median_days_to_plan ?? '–'} days from report to plan</>} />
           </div>
           <div className="grid g-2">
-            <Card title={t('stat_languages_heard', 'Languages heard')} sub={`${d.languages} languages · ${pct(d.inclusion.non_english_share)} non-English`}><HBar data={langs} dataKey="value" format={(v) => fmt(v)} /></Card>
+            <Card title="Languages heard" sub={`${d.languages} languages · ${pct(d.inclusion.non_english_share)} non-English`}><HBar data={langs} dataKey="value" format={(v) => fmt(v)} /></Card>
             <Card title="Monthly reports" sub="Volume through all channels"><HBar data={d.monthly_volume.slice(-8).map((m) => ({ name: m.month, value: m.requests }))} dataKey="value" format={(v) => fmt(v)} /></Card>
           </div>
         </>

@@ -18,7 +18,7 @@ export default function Brief() {
         <select className="select" style={{ width: 'auto' }} value={country} onChange={(e) => setSp({ country: e.target.value })} aria-label="Country">
           {['IN', 'BR', 'ZA'].map((c) => <option key={c} value={c}>{COUNTRIES[c]}</option>)}</select>
         <select className="select" style={{ width: 'auto' }} value={district} onChange={(e) => setSp({ country, district: e.target.value })} aria-label="District">
-          <option value="">Whole country</option>{(DISTRICTS[country] || []).map((d) => <option key={d} value={d}>{d}</option>)}</select>
+          <option value="">Whole country</option>{DISTRICTS[country].map((d) => <option key={d} value={d}>{d}</option>)}</select>
         <button className="btn btn-primary" onClick={() => window.print()}><Printer size={16} aria-hidden="true" />Print / save as PDF</button>
       </div>
       <ErrorBox error={error} />

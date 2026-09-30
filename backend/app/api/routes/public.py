@@ -20,7 +20,50 @@ from app.services import analytics_cache, clustering, pipeline, privacy, scoring
 from app.services.ai.lexicon import sector_sdg
 from app.services.geo import gazetteer
 
-router = APIRouter(tags=["public"])
+router = APIRouter(tags=["public & auth"])
+
+
+class LoginIn(BaseModel):
+    username: str
+    password: str
+
+
+@router.post("/auth/login")
+def login(body: LoginIn):
+    return security.login(body.username, body.password)
+
+
+class OtpIn(BaseModel):
+    phone: str
+    code: str = ""
+
+
+@router.post("/auth/citizen/send-code")
+def citizen_send_code(body: OtpIn):
+    return security.send_otp(body.phone)
+
+
+@router.post("/auth/citizen/verify")
+def citizen_verify(body: OtpIn):
+    return security.verify_otp(body.phone, body.code)
+
+
+@router.get("/citizen/me/requests")
+def my_requests_logged_in(hashes: list[str] = Depends(security.citizen_hashes), db: Session = Depends(get_db)):
+    rows = (db.query(CitizenRequest).filter(CitizenRequest.household_hash.in_(hashes))
+            .order_by(CitizenRequest.created_at.desc()).limit(100).all())
+    return [request_out(r) for r in rows]
+
+
+@router.get("/auth/me")
+def me(role: str = Depends(security.current_role)):
+    return {"role": role, "logged_in": role != "citizen"}
+
+
+@router.get("/auth/demo-accounts")
+def demo_accounts():
+    return [{"username": k, "password": v["password"], "role": v["role"], "name": v["name"], "title": v["title"]}
+            for k, v in security.DEMO_USERS.items()]
 
 
 @router.get("/citizen/requests")
@@ -69,7 +112,7 @@ def support(cluster_id: int, body: SupportIn, db: Session = Depends(get_db)):
         translation_mode="source", country_code=c.country_code, area_id=c.area_id, lat=c.area.lat, lng=c.area.lng,
         category=c.category, subcategory=c.subcategory, severity=max(1, round(c.severity_avg)), sdg=sector_sdg(c.category),
         confidence=1.0, extraction_mode="support", household_hash=hh, status="clustered", cluster_id=c.id,
-        proof_count=0, created_at=datetime.utcnow(), updated_at=datetime.utcnow(),
+        created_at=datetime.utcnow(), updated_at=datetime.utcnow(),
     )
     r.area = c.area
     db.add(r)
@@ -87,7 +130,7 @@ def board(country: str | None = None, db: Session = Depends(get_db)):
     """Transparency: what citizens asked for and what government did about it."""
     q = db.query(CitizenRequest)
     pq = db.query(Project).filter(Project.status.in_(["approved", "in_progress", "completed"]))
-    if country and country != "all":
+    if country:
         q = q.filter(CitizenRequest.country_code == country)
         pq = pq.filter(Project.country_code == country)
     projects = pq.order_by(Project.status.desc(), Project.completed_at.desc()).all()
@@ -101,24 +144,6 @@ def board(country: str | None = None, db: Session = Depends(get_db)):
             voices = (db.query(func.count(func.distinct(CitizenRequest.household_hash)))
                       .filter(CitizenRequest.area_id == p.area_id, CitizenRequest.category == p.sector).scalar() or 0)
         items.append({**project_out(p), "citizen_voices": voices})
-
-    reopened_requests = q.filter(CitizenRequest.status == "reopened").order_by(CitizenRequest.updated_at.desc()).limit(50).all()
-    disputed_cases = [
-        {
-            "id": r.id,
-            "tracking_id": r.tracking_id,
-            "category": r.category,
-            "area": r.area.name if r.area else "Unknown",
-            "state": r.area.state if r.area else None,
-            "country": r.country_code or (r.area.country_code if r.area else "IN"),
-            "dispute_reason": r.dispute_reason or "Work incomplete or not functioning as claimed",
-            "status": r.status,
-            "updated_at": r.updated_at.isoformat() if r.updated_at else None,
-            "department": r.assigned_department or pipeline.get_department_for_sector(r.category),
-        }
-        for r in reopened_requests
-    ]
-
     return {
         "requests": q.count(),
         "households": q.with_entities(func.count(func.distinct(CitizenRequest.household_hash))).scalar(),
@@ -128,7 +153,6 @@ def board(country: str | None = None, db: Session = Depends(get_db)):
         "in_progress": sum(1 for i in items if i["status"] == "in_progress"),
         "approved": sum(1 for i in items if i["status"] == "approved"),
         "items": items,
-        "disputed_cases": disputed_cases,
     }
 
 

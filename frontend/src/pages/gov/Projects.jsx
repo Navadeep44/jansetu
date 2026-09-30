@@ -11,7 +11,6 @@ import { COUNTRIES, LANG_NAMES, SECTORS, SECTOR_KEYS, fmt, money, usd } from '..
 const BUDGET_MAX = { IN: 6e9, BR: 3e8, ZA: 2e9 }
 
 function WhyCard({ id, onChanged }) {
-  const { t } = useApp()
   const { data, loading, error, reload } = useAsync(() => api.project(id), [id])
   const [reason, setReason] = useState('')
   const [err, setErr] = useState(null)
@@ -27,15 +26,15 @@ function WhyCard({ id, onChanged }) {
   return (
     <Card title={p.title} sub={`${p.area}, ${p.district} · ${COUNTRIES[p.country]} · ${p.sdg}`} actions={<StatusBadge status={p.status} />}>
       <div className="grid g-3">
-        <div><div className="stat-label">{t('priority_score', 'Priority score')}</div><div className="stat-value">{p.score}</div></div>
-        <div><div className="stat-label">{t('estimated_cost', 'Estimated cost')}</div><div className="stat-value" style={{ fontSize: '1.3rem' }}>{money(p.cost_local, p.country)}</div><div className="xs muted">{usd(p.cost_usd)}</div></div>
-        <div><div className="stat-label">{t('beneficiaries', 'Beneficiaries')}</div><div className="stat-value" style={{ fontSize: '1.3rem' }}>{fmt(p.beneficiaries)}</div></div>
+        <div><div className="stat-label">Priority score</div><div className="stat-value">{p.score}</div></div>
+        <div><div className="stat-label">Estimated cost</div><div className="stat-value" style={{ fontSize: '1.3rem' }}>{money(p.cost_local, p.country)}</div><div className="xs muted">{usd(p.cost_usd)}</div></div>
+        <div><div className="stat-label">Beneficiaries</div><div className="stat-value" style={{ fontSize: '1.3rem' }}>{fmt(p.beneficiaries)}</div></div>
       </div>
       <div className="row mt"><SectorTag sector={p.sector} /><Badge tone="blue">Funding: {p.scheme}</Badge></div>
       {ex && (
         <>
           <div className="divider" />
-          <h3 className="row"><Lightbulb size={18} aria-hidden="true" />{t('why_this_project', 'Why this project?')}</h3>
+          <h3 className="row"><Lightbulb size={18} aria-hidden="true" />Why this project?</h3>
           <ul className="small" style={{ paddingLeft: 18 }}>{ex.facts.map((f) => <li key={f} style={{ color: f.startsWith('SILENT') ? 'var(--color-silent)' : undefined, fontWeight: f.startsWith('SILENT') ? 600 : 400 }}>{f}</li>)}</ul>
           <div className="stack mt">
             {ex.drivers.map((d) => (
@@ -44,7 +43,7 @@ function WhyCard({ id, onChanged }) {
             ))}
             <div className="xs muted">{ex.formula}. Need-Gap Index {ex.ngi}; cost-efficiency percentile {ex.efficiency_pct}.</div>
           </div>
-          <h3 className="mt">{t('citizen_evidence', 'Citizen evidence')}</h3>
+          <h3 className="mt">Citizen evidence</h3>
           <div className="stack">
             {ex.evidence.map((q) => (
               <div key={q.tracking_id} className="quote"><div className="orig">{q.original}</div><div className="en">{q.english}</div>
@@ -60,9 +59,9 @@ function WhyCard({ id, onChanged }) {
           <div className="field"><label htmlFor="reason">Decision note (required to reject or defer; logged for audit)</label>
             <input id="reason" className="input" value={reason} onChange={(e) => setReason(e.target.value)} placeholder="e.g. Convergence with PMGSY confirmed; DPR to be prepared" /></div>
           <div className="row mt">
-            <button className="btn btn-primary" onClick={() => decide('approve')}><CheckCircle2 size={16} aria-hidden="true" />{t('approve', 'Approve')}</button>
-            <button className="btn" onClick={() => decide('defer')}><PauseCircle size={16} aria-hidden="true" />{t('defer', 'Defer')}</button>
-            <button className="btn btn-danger" onClick={() => decide('reject')}><XCircle size={16} aria-hidden="true" />{t('reject', 'Reject')}</button>
+            <button className="btn btn-primary" onClick={() => decide('approve')}><CheckCircle2 size={16} aria-hidden="true" />Approve</button>
+            <button className="btn" onClick={() => decide('defer')}><PauseCircle size={16} aria-hidden="true" />Defer</button>
+            <button className="btn btn-danger" onClick={() => decide('reject')}><XCircle size={16} aria-hidden="true" />Reject</button>
             <button className="btn" onClick={() => decide('start')}><Hammer size={16} aria-hidden="true" />Start work</button>
             <button className="btn btn-success" onClick={() => decide('complete')}><Clock size={16} aria-hidden="true" />Mark complete</button>
           </div>
@@ -117,7 +116,7 @@ function Optimiser({ defaultCountry }) {
             </div>
             <div className="table-wrap mt"><table className="table">
               <thead><tr><th>Project</th><th>Sector</th><th className="num">Cost</th><th className="num">Beneficiaries</th><th className="num">Score</th></tr></thead>
-              <tbody>{(res.projects || []).sort((a, b) => b.score - a.score).map((p) => (
+              <tbody>{res.projects.sort((a, b) => b.score - a.score).map((p) => (
                 <tr key={p.id}><td><strong>{p.title}</strong>{p.score_breakdown?.silent_zone && <> <Badge tone="violet">silent zone</Badge></>}</td><td><SectorTag sector={p.sector} short /></td>
                   <td className="num">{money(p.cost_local, p.country)}</td><td className="num">{fmt(p.beneficiaries)}</td><td className="num">{p.score}</td></tr>))}</tbody>
             </table></div>
@@ -137,7 +136,7 @@ function Optimiser({ defaultCountry }) {
 }
 
 export default function Projects() {
-  const { countryParam, country, t } = useApp()
+  const { countryParam, country } = useApp()
   const [sp, setSp] = useSearchParams()
   const [tab, setTab] = useState(sp.get('tab') || 'recommended')
   const [selected, setSelected] = useState(sp.get('id') ? Number(sp.get('id')) : null)
@@ -154,14 +153,14 @@ export default function Projects() {
 
   return (
     <div className="stack-md">
-      <PageHead title={t('projects_title', 'Projects & budget')} actions={<button className="btn" onClick={regenerate} disabled={regen}><RefreshCw size={16} aria-hidden="true" />{regen ? 'Updating…' : 'Refresh suggestions'}</button>}>
-        {t('projects_subtitle', 'What to build first, how much it costs, and why.')}
+      <PageHead title="Projects & budget" actions={<button className="btn" onClick={regenerate} disabled={regen}><RefreshCw size={16} aria-hidden="true" />{regen ? 'Updating…' : 'Refresh suggestions'}</button>}>
+        What to build first, how much it costs, and why.
       </PageHead>
       <Tabs value={tab} onChange={change} tabs={[
-        { value: 'recommended', label: `${t('tab_recommended', 'Suggested by AI')} (${recs.data?.length ?? '…'})` },
-        { value: 'optimiser', label: t('tab_optimiser', 'Budget planner') },
+        { value: 'recommended', label: `Suggested by AI (${recs.data?.length ?? '…'})` },
+        { value: 'optimiser', label: 'Budget planner' },
         { value: 'misaligned', label: `Money in low-need areas (${misaligned.length})` },
-        { value: 'plans', label: t('tab_all_projects', 'Existing plans') },
+        { value: 'plans', label: 'Existing plans' },
       ]} />
       {tab === 'recommended' && (
         <>
@@ -171,11 +170,11 @@ export default function Projects() {
           <div className="grid g-2" style={{ alignItems: 'start' }}>
             <Card title="Ranked shortlist" actions={
               <select className="select" style={{ width: 'auto', minHeight: 36 }} value={sector} onChange={(e) => setSector(e.target.value)} aria-label="Sector">
-                <option value="all">{t('all_sectors', 'All sectors')}</option>{SECTOR_KEYS.map((s) => <option key={s} value={s}>{SECTORS[s].label}</option>)}</select>}>
+                <option value="all">All sectors</option>{SECTOR_KEYS.map((s) => <option key={s} value={s}>{SECTORS[s].label}</option>)}</select>}>
               {recs.loading ? <Loading height={400} /> : (
                 <div className="table-wrap" style={{ maxHeight: 720, overflowY: 'auto' }}><table className="table">
-                  <thead><tr><th>Project</th><th>{t('priority_score', 'Score')}</th><th className="num">{t('estimated_cost', 'Cost')}</th><th>{t('status_label', 'Status')}</th></tr></thead>
-                  <tbody>{(recs.data || []).map((p) => (
+                  <thead><tr><th>Project</th><th>Score</th><th className="num">Cost</th><th>Status</th></tr></thead>
+                  <tbody>{recs.data.map((p) => (
                     <tr key={p.id} className="clickable" onClick={() => setSelected(p.id)} style={{ background: selected === p.id ? 'var(--color-accent-soft)' : undefined }}>
                       <td><div className="row" style={{ gap: 6 }}><SectorTag sector={p.sector} short />{p.score_breakdown?.silent_zone && <Badge tone="violet"><VolumeX size={12} aria-hidden="true" />silent</Badge>}</div>
                         <button className="btn-ghost" style={{ border: 0, padding: 0, textAlign: 'left', cursor: 'pointer', fontWeight: 600, background: 'none' }} onClick={() => setSelected(p.id)}>{p.title}</button>
@@ -196,7 +195,7 @@ export default function Projects() {
           <div className="alert alert-warn" style={{ marginBottom: 12 }}><AlertTriangle size={18} aria-hidden="true" />
             <div className="small">{al.data && Object.entries(al.data).map(([c, v]) => `${COUNTRIES[c]}: ${Math.round(v.share_to_below_median_need * 100)}% of ${usd(v.plan_budget_usd)} planned`).join(' · ')}</div></div>
           <div className="table-wrap"><table className="table">
-            <thead><tr><th>Plan item</th><th>{t('th_area', 'Area')}</th><th>{t('th_sector', 'Sector')}</th><th className="num">{t('estimated_cost', 'Cost')}</th><th>Need there</th><th className="num">Country median</th><th>{t('status_label', 'Status')}</th></tr></thead>
+            <thead><tr><th>Plan item</th><th>Area</th><th>Sector</th><th className="num">Cost</th><th>Need there</th><th className="num">Country median</th><th>Status</th></tr></thead>
             <tbody>{misaligned.map((p) => (
               <tr key={p.code}><td><strong>{p.title}</strong><div className="xs muted mono">{p.code}</div></td><td>{p.area}</td><td><SectorTag sector={p.sector} short /></td>
                 <td className="num">{money(p.cost_local, p.country)}</td><td style={{ minWidth: 140 }}><NgiBar value={p.need_ngi} /></td><td className="num">{p.country_median_ngi}</td><td><StatusBadge status={p.status} /></td></tr>))}</tbody>
@@ -207,8 +206,8 @@ export default function Projects() {
         <Card title="Existing public investment plans" sub="Imported from GPDP / eGramSwaraj (India), PPA (Brazil), municipal IDPs (South Africa)">
           {plans.loading ? <Loading /> : (
             <div className="table-wrap"><table className="table">
-              <thead><tr><th>Code</th><th>Project</th><th>{t('th_area', 'Area')}</th><th>{t('th_sector', 'Sector')}</th><th className="num">{t('estimated_cost', 'Cost')}</th><th className="num">{t('beneficiaries', 'Beneficiaries')}</th><th>{t('status_label', 'Status')}</th></tr></thead>
-              <tbody>{(plans.data || []).map((p) => (
+              <thead><tr><th>Code</th><th>Project</th><th>Area</th><th>Sector</th><th className="num">Cost</th><th className="num">Beneficiaries</th><th>Status</th></tr></thead>
+              <tbody>{plans.data.map((p) => (
                 <tr key={p.id}><td className="mono xs">{p.code}</td><td><strong>{p.title}</strong><div className="xs muted">{p.scheme}</div></td><td>{p.area}</td><td><SectorTag sector={p.sector} short /></td>
                   <td className="num">{money(p.cost_local, p.country)}</td><td className="num">{fmt(p.beneficiaries)}</td><td><StatusBadge status={p.status} /></td></tr>))}</tbody>
             </table></div>
