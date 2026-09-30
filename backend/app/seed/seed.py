@@ -181,17 +181,23 @@ def run():
         for s in SECTORS:
             plan = plan_rows.get((a.name, s))
             deficit = 1 - (IMPROVED.get((a.name, s)) or a.infra[s])
-            lam = (a.households / 1000) ** 0.6 * deficit ** 1.4 * a.connectivity ** 1.5 * 42 * SECTOR_RATE[s]
+            lam = (a.households / 1000) ** 0.6 * deficit ** 1.4 * a.connectivity ** 1.5 * 4.6 * SECTOR_RATE[s]
             n = min(170, int(RNG.gauss(lam, lam * 0.15)))
+            if plan and plan[8] is not None:
+                for _ in range(8):
+                    created = NOW - timedelta(days=plan[8] + RNG.uniform(15, 150), hours=RNG.uniform(0, 23))
+                    lang = _lang_for(a, s)
+                    tpl = RNG.choice(BY_LANG[(lang, s)])
+                    requests.append(_make(db, a, s, tpl, created, RNG.randint(1, pool)))
             for _ in range(max(0, n)):
                 created = NOW - timedelta(days=RNG.uniform(0, 365) ** 1.05 / 365 ** 0.05, hours=RNG.uniform(0, 23))
-                if plan and plan[8] is not None and created > NOW - timedelta(days=plan[8]) and RNG.random() > 0.2:
-                    continue  # project completed: complaints drop
+                if plan and plan[8] is not None and created > NOW - timedelta(days=plan[8]):
+                    continue  # project completed: complaints drop to zero
                 lang = _lang_for(a, s)
                 tpl = RNG.choice(BY_LANG[(lang, s)])
                 requests.append(_make(db, a, s, tpl, created, RNG.randint(1, pool)))
             if a.vulnerability < 0.2 and s in ("roads", "electricity"):  # affluent 'loud' convenience complaints
-                loud = int((a.households / 1000) ** 0.6 * a.connectivity ** 2 * 9)
+                loud = int((a.households / 1000) ** 0.6 * a.connectivity ** 2 * 1)
                 opts = [x for x in AFFLUENT if x[1] == s and x[0] in a.primary_languages] or [x for x in AFFLUENT if x[1] == s and x[0] == "en"]
                 for _ in range(loud):
                     created = NOW - timedelta(days=RNG.uniform(0, 365))
@@ -646,39 +652,84 @@ def run():
 
     if fu:
         utnoor_reqs = db.query(CitizenRequest).filter(CitizenRequest.area_id == utnoor_area.id).all()
-        for idx, r in enumerate(utnoor_reqs[:14]):
+        showcase_cases = [
+            ("JS-TG-UTN-001", "water", 4, "ఉట్నూర్ మెయిన్ రోడ్డు వద్ద తాగునీటి పైపులైన్ పగిలి నీరంతా రోడ్డుపై వృథాగా పోతోంది. 45 కుటుంబాలకు నీటి సరఫరా నిలిచిపోయింది.", "Main drinking water pipeline burst at Utnoor main junction; water flooding the road and 45 tribal households left without supply.", "assigned", 24, None, None),
+            ("JS-TG-UTN-002", "roads", 4, "జిల్లా పరిషత్ ఉన్నత పాఠశాల సమీపంలో కల్వర్టు కూలిపోయి పెద్ద గుంత ఏర్పడింది, స్కూల్ బస్సులు రావడం లేదు.", "Culvert collapsed and deep crater formed near Zilla Parishad High School; school buses cannot ply safely.", "assigned", 48, None, None),
+            ("JS-TG-UTN-003", "health", 5, "ప్రాథమిక ఆరోగ్య ఉపకేంద్రంలో సోలార్ ఇన్వర్టర్ బ్యాటరీ పనిచేయడం లేదు, అత్యవసర టీకాలు పాడయ్యే ప్రమాదం ఉంది.", "Solar inverter battery failed at Primary Health Sub-Centre; emergency vaccines at risk without cold storage.", "assigned", 72, None, None),
+            ("JS-TG-UTN-004", "electricity", 4, "మార్కెట్ యార్డ్ వద్ద 11 కేవీ విద్యుత్ ట్రాన్స్‌ఫార్మర్ రాత్రి పూట నిప్పులు చెరుగుతోంది, ప్రమాదకరం.", "11kV street transformer sparking intermittently during evening hours near Utnoor Market Yard.", "in_progress", 36, None, None),
+            ("JS-TG-UTN-005", "sanitation", 3, "గ్రామ పంచాయతీ కార్యాలయం వెనుక మురుగు కాలువ పూడికతో నిండిపోయి కాలిబాటపై ప్రవహిస్తోంది.", "Open drainage clogged with silt and plastic debris overflowing onto pedestrian pathway behind Gram Panchayat.", "in_progress", 36, None, None),
+            ("JS-TG-UTN-006", "water", 5, "వార్డు 3 లోని బోరు మోటారు కాలిపోయి 8 రోజులు అయింది, తాగడానికి నీళ్ళు లేక మహిళలు 2 కిలోమీటర్లు నడవాల్సి వస్తోంది.", "Borewell motor burnt out 8 days ago in Ward 3; villagers walking 2km for potable drinking water.", "in_progress", -48, None, None),
+            ("JS-TG-UTN-007", "water", 3, "పైపులైన్ జాయింట్ లీకేజీ సరిగా వెల్డింగ్ చేయలేదు, మళ్ళీ నీరు కారుతోంది.", "Pipeline joint weld incomplete on eastern section. Re-seal and submit fresh photo proof.", "assigned", 24, "Pipe joint weld incomplete on eastern section. Re-seal and submit fresh photo proof.", None),
+            ("JS-TG-UTN-008", "water", 4, "నీటి ఒత్తిడి చాలా తక్కువగా ఉంది, సాయంత్రం వేళల్లో మురికి నీరు వస్తోంది.", "Water pressure still too low; muddy water flowing in evening supply. Citizen disputed completion.", "reopened", 18, None, "Water pressure still too low; dirty water coming out during evening supply."),
+            ("JS-TG-UTN-009", "water", 3, "కొత్త బోరుబావి మరియు సోలార్ పంప్ అమర్చారు, మంచినీటి సమస్య తీరింది.", "New high-yield borewell drilled and solar dual pump commissioned. Action Taken Report with GPS photo proof submitted.", "resolved_pending_verification", 0, None, None),
+            ("JS-TG-UTN-010", "roads", 3, "కల్వర్టు పునర్నిర్మాణం మరియు రోడ్డు పనులు పూర్తయ్యాయి. సర్పంచ్ మరియు గ్రామస్తులు తనిఖీ చేసి ధృవీకరించారు.", "Culvert reconstructed and all-weather road laid. Verified on ground by Gram Panchayat sarpanch. Citizen rated 5/5.", "closed_verified", 0, None, None),
+            ("JS-TG-UTN-011", "education", 3, "గిరిజన సంక్షేమ బాలుర హాస్టల్ పైకప్పు వర్షానికి కారుతోంది, పిల్లల పుస్తకాలు తడుస్తున్నాయి.", "Roof leak in Tribal Welfare Boys Hostel during monsoon rain; study halls waterlogged.", "assigned", 30, None, None),
+            ("JS-TG-UTN-012", "sanitation", 3, "సంత బజారు ప్రజా మరుగుదొడ్లలో నీటి సరఫరా మరియు డోర్ లాక్ రిపేర్ చేయాలి.", "Weekly market public toilet block needs tap repair and door latch replacement.", "in_progress", 40, None, None),
+            ("JS-TG-UTN-013", "electricity", 3, "ఆశ్రమ పాఠశాల రోడ్డులో రెండు వీధి దీపాలు వెలగడం లేదు, విద్యార్థులకు ఇబ్బందిగా ఉంది.", "Two solar street lights dark along Ashram School access road; unsafe for students at night.", "resolved_pending_verification", 0, None, None),
+            ("JS-TG-UTN-014", "water", 3, "బోరు పంపు హ్యాండిల్ విరిగిపోయింది, వెంటనే సరిచేయగలరు.", "Handpump handle pivot cracked in Ward 2; repair team dispatched.", "closed_verified", 0, None, None),
+        ]
+        for idx, (tid, cat, sev, orig, transl, st, sla_hrs, rework, dispute) in enumerate(showcase_cases):
+            if idx < len(utnoor_reqs):
+                r = utnoor_reqs[idx]
+            else:
+                r = _make(db, utnoor_area, cat, ("te", cat, orig, transl), NOW - timedelta(days=idx + 1), 6000 + idx)
+            r.tracking_id = tid
+            r.category = cat
+            r.severity = sev
+            r.original_text = orig
+            r.translated_text = transl
             r.assigned_field_officer_id = fu.id
             r.assigned_officer = fu.name
-            r.assigned_department = "water"
+            r.assigned_department = get_department_for_sector(cat)
             r.block = "Utnoor"
             r.assigned_at = NOW - timedelta(days=idx + 1)
-            
-            if idx in (0, 1, 2):
-                # New / Assigned with active SLA countdown
-                r.status = "assigned"
-                r.sla_due_at = NOW + timedelta(hours=(idx + 1) * 24)
-            elif idx in (3, 4, 5):
-                # Work In Progress
-                r.status = "in_progress"
-                r.sla_due_at = NOW + timedelta(hours=36)
-            elif idx in (6, 7):
-                # Overdue SLA
-                r.status = "in_progress"
-                r.sla_due_at = NOW - timedelta(hours=48)
-            elif idx in (8, 9):
-                # Rework requested
-                r.status = "assigned"
-                r.rework_note = "Pipe joint weld incomplete on eastern section. Re-seal and submit fresh photo proof."
-                r.sla_due_at = NOW + timedelta(hours=24)
-            elif idx in (10, 11):
-                # Citizen Disputed / Reopened
-                r.status = "reopened"
-                r.dispute_reason = "Water pressure still too low; dirty water coming out during evening supply."
-                r.sla_due_at = NOW + timedelta(hours=18)
-            else:
-                # Resolved with proof
-                r.status = "resolved_pending_verification"
+            r.status = st
+            r.rework_note = rework or ""
+            r.dispute_reason = dispute or ""
+            if sla_hrs != 0:
+                r.sla_due_at = NOW + timedelta(hours=sla_hrs)
+            if st in ("resolved_pending_verification", "closed_verified"):
                 r.resolved_at = NOW - timedelta(days=2)
+                r.proof_count = max(1, r.proof_count)
+            if st == "closed_verified":
+                r.citizen_verified = True
+                r.citizen_rating = 5
+
+    if fm:
+        mehrauli_area = areas.get("South Delhi") or areas.get("Vasant Vihar") or utnoor_area
+        delhi_reqs = db.query(CitizenRequest).filter(CitizenRequest.area_id == mehrauli_area.id).all()
+        delhi_showcase = [
+            ("JS-DL-MEH-001", "roads", 4, "सड़क पर गहरा गड्ढा है, साकेत मोड़ के पास रोज़ गाड़ियाँ दुर्घटनाग्रस्त हो रही हैं।", "Deep road crater and pothole near Saket turn on Mehrauli Badarpur Road causing traffic accidents.", "assigned", 24),
+            ("JS-DL-MEH-002", "sanitation", 4, "सीवर लाइन का ढक्कन टूटा हुआ है, रात को पैदल चलने वालों के लिए बहुत खतरनाक है।", "Broken sewer manhole cover on Main Market lane; hazardous for pedestrians at night.", "assigned", 48),
+            ("JS-DL-MEH-003", "electricity", 3, "पार्क के बाहर हाई मास्ट लाइट 3 हफ़्ते से बंद पड़ी है, रात में अंधेरा रहता है।", "Public park high-mast LED floodlight non-functional for 3 weeks; dark at night.", "in_progress", 36),
+            ("JS-DL-MEH-004", "water", 3, "गली नंबर 4 में पीने के पानी का दबाव बहुत कम है, अंतिम छोर तक पानी नहीं पहुँचता।", "Low drinking water pressure in Lane 4; tail-end households receiving inadequate supply.", "in_progress", 36),
+            ("JS-DL-MEH-005", "roads", 3, "पैदल पथ की टाइलें टूटी हुई हैं, बुजुर्गों के चलने में परेशानी होती है।", "Pedestrian footpath pavers cracked and dislodged; hazardous for senior citizens.", "resolved_pending_verification", 0),
+            ("JS-DL-MEH-006", "electricity", 3, "स्ट्रीट लाइट का खंभा झुक गया है, सीधा किया जाए।", "Street light pole tilted after vehicle impact; realignment and rewiring requested.", "closed_verified", 0),
+        ]
+        for idx, (tid, cat, sev, orig, transl, st, sla_hrs) in enumerate(delhi_showcase):
+            if idx < len(delhi_reqs):
+                r = delhi_reqs[idx]
+            else:
+                r = _make(db, mehrauli_area, cat, ("hi", cat, orig, transl), NOW - timedelta(days=idx + 1), 7000 + idx)
+            r.tracking_id = tid
+            r.category = cat
+            r.severity = sev
+            r.original_text = orig
+            r.translated_text = transl
+            r.assigned_field_officer_id = fm.id
+            r.assigned_officer = fm.name
+            r.assigned_department = get_department_for_sector(cat)
+            r.block = "Mehrauli"
+            r.assigned_at = NOW - timedelta(days=idx + 1)
+            r.status = st
+            if sla_hrs != 0:
+                r.sla_due_at = NOW + timedelta(hours=sla_hrs)
+            if st in ("resolved_pending_verification", "closed_verified"):
+                r.resolved_at = NOW - timedelta(days=1)
+                r.proof_count = 1
+            if st == "closed_verified":
+                r.citizen_verified = True
+                r.citizen_rating = 5
 
     # ---- V2 Governance & Officer Dashboard Suite Seeding --------------------------
     seed_v2_governance_suite(db)
