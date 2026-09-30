@@ -47,7 +47,7 @@ export default function Ask() {
   const points = res?.rows?.filter((r) => r.lat && r.lng).map((r, i) => ({ area_id: r.area_id || i, area: r.area, district: r.district, lat: r.lat, lng: r.lng, population: 100000, ngi_max: r.ngi ?? 70, hotspot: { z: r.gi_z ?? '', class: '' }, sectors: {}, silent_zone: !!r.silent_score, silent_sectors: r.sector ? [r.sector] : [] }))
   return (
     <div className="stack-md">
-      <PageHead title="Ask a question" actions={<Link className="btn" to={`/brief?country=${country === 'all' ? 'IN' : country}`}><FileText size={16} aria-hidden="true" />Generate policy brief</Link>}>
+      <PageHead title="Ask a question" eyebrow="Official workspace" steps={["Type a question in plain words", "Or tap an example", "Get an answer with the numbers"]} actions={<Link className="btn" to={`/brief?country=${country === 'all' ? 'IN' : country}`}><FileText size={16} aria-hidden="true" />Generate policy brief</Link>}>
         Type or speak a question in any language.
       </PageHead>
       <Card>

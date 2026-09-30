@@ -98,7 +98,7 @@ export default function Officer() {
   const d = q.data
   return (
     <div className="stack-md">
-      <PageHead title="Officer inbox">Reports the AI was unsure about, urgent cases, and closures to check.</PageHead>
+      <PageHead title="Officer inbox" eyebrow="Official workspace" steps={["Open a report", "Fix the problem type or place", "Press Confirm: the citizen is told"]}>Reports the AI was unsure about, urgent cases, and closures to check.</PageHead>
       <Tabs value={tab} onChange={setTab} tabs={[
         { value: 'review', label: `To review (${d?.needs_review?.length ?? '…'})` },
         { value: 'closures', label: `Fake closures (${d?.formulaic_closures?.length ?? '…'})` },

@@ -12,7 +12,7 @@ import {
 import Navbar from '../components/landing/Navbar'
 import { api } from '../api/client'
 import { useAsync } from '../lib/useAsync'
-import '../styles/landing.css'
+
 
 gsap.registerPlugin(ScrollTrigger, useGSAP)
 const Globe3D = lazy(() => import('../components/landing/Globe3D'))

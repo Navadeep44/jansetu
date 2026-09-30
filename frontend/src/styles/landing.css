@@ -1,5 +1,6 @@
 /* ================= JanSetu landing page ================= */
-.lp { --lp-navy: #060d1a; --lp-navy-2: #0b1a33; --lp-sky: #38bdf8; --lp-amber: #f59e0b; --lp-ink: #0f172a;
+:root { --lp-navy: #060d1a; --lp-navy-2: #0b1a33; --lp-sky: #38bdf8; --lp-amber: #f59e0b; --lp-ink: #0f172a; }
+.lp {
   background: #f8fafc; color: var(--lp-ink); overflow-x: hidden; }
 .lp a { text-decoration: none; }
 

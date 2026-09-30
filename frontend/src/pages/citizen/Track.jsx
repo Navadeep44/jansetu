@@ -6,7 +6,7 @@ import { useApp } from '../../context/AppContext'
 import { tr } from '../../i18n/strings'
 import { SpeakButton } from '../../components/citizen/VoiceInput'
 import ReplyBox from '../../components/citizen/ReplyBox'
-import { Badge, Card, ErrorBox, Loading, SectorTag, StatusBadge } from '../../components/ui'
+import { Badge, Card, ErrorBox, Loading, PageHead, SectorTag, StatusBadge } from '../../components/ui'
 import { CHANNEL_LABEL, LANG_NAMES, date, money } from '../../lib/format'
 
 export default function Track() {
@@ -49,8 +49,8 @@ export default function Track() {
 
   const r = data?.request
   return (
-    <div className="stack-md" style={{ maxWidth: 1000 }}>
-      <h1>{L('track_title')}</h1>
+    <div className="stack-md narrow">
+      <PageHead title={L('track_title')} eyebrow="For citizens · no login needed" steps={['Enter your tracking ID or phone', 'See every update', 'Reply or confirm the fix']}>See what happened to your request, answer questions, and say if it was really fixed.</PageHead>
       {isCitizen && myList && (
         <Card title={`My requests (${myList.length})`} sub={`Logged in as ${user.name}`}>
           {myList.length ? (

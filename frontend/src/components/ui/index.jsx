@@ -1,3 +1,5 @@
+import { useId } from 'react'
+import { motion } from 'framer-motion'
 import { AlertTriangle, Loader2 } from 'lucide-react'
 import { SECTORS, STATUS_LABEL, STATUS_TONE, ngiColor } from '../../lib/format'
 
@@ -66,11 +68,13 @@ export const ErrorBox = ({ error }) => error ? (
 export const Empty = ({ children = 'Nothing to show yet.' }) => <div className="empty">{children}</div>
 
 export function Tabs({ tabs, value, onChange, label = 'Sections' }) {
+  const uid = useId()
   return (
     <div className="tabs" role="tablist" aria-label={label}>
       {tabs.map((t) => (
         <button key={t.value} role="tab" className="tab" aria-selected={value === t.value} onClick={() => onChange(t.value)}>
-          {t.label}
+          {value === t.value && <motion.span layoutId={`tab-${uid}`} className="tab-pill" transition={{ type: 'spring', stiffness: 420, damping: 34 }} />}
+          <span className="tab-label">{t.label}</span>
         </button>
       ))}
     </div>
@@ -78,23 +82,37 @@ export function Tabs({ tabs, value, onChange, label = 'Sections' }) {
 }
 
 export function Seg({ options, value, onChange, label }) {
+  const uid = useId()
   return (
     <div className="seg" role="group" aria-label={label}>
       {options.map((o) => (
-        <button key={o.value} type="button" aria-pressed={value === o.value} onClick={() => onChange(o.value)}>{o.label}</button>
+        <button key={o.value} type="button" aria-pressed={value === o.value} onClick={() => onChange(o.value)}>
+          {value === o.value && <motion.span layoutId={`seg-${uid}`} className="seg-pill" transition={{ type: 'spring', stiffness: 420, damping: 34 }} />}
+          <span className="tab-label">{o.label}</span>
+        </button>
       ))}
     </div>
   )
 }
 
-export function PageHead({ title, children, actions }) {
+// Dark hero band at the top of every page (matches the landing page).
+// steps: 2-4 very short "how to use this page" hints shown as numbered chips.
+export function PageHead({ title, children, actions, eyebrow, steps, icon: Icon, overlap = true }) {
   return (
-    <header className="page-head">
-      <div>
-        <h1>{title}</h1>
-        {children && <p className="muted">{children}</p>}
+    <header className={`page-hero ${overlap ? 'overlap' : ''}`}>
+      <div className="page-hero-inner">
+        <div className="page-hero-text">
+          {eyebrow && <span className="page-eyebrow">{Icon && <Icon size={14} aria-hidden="true" />}{eyebrow}</span>}
+          <h1>{title}</h1>
+          {children && <p className="page-sub">{children}</p>}
+          {steps?.length > 0 && (
+            <ol className="page-steps" aria-label="How to use this page">
+              {steps.map((s, i) => <li key={s}><span>{i + 1}</span>{s}</li>)}
+            </ol>
+          )}
+        </div>
+        {actions && <div className="page-hero-actions">{actions}</div>}
       </div>
-      {actions && <div className="row">{actions}</div>}
     </header>
   )
 }

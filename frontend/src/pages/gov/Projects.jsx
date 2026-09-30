@@ -153,7 +153,7 @@ export default function Projects() {
 
   return (
     <div className="stack-md">
-      <PageHead title="Projects & budget" actions={<button className="btn" onClick={regenerate} disabled={regen}><RefreshCw size={16} aria-hidden="true" />{regen ? 'Updating…' : 'Refresh suggestions'}</button>}>
+      <PageHead title="Projects & budget" eyebrow="Official workspace" steps={["See projects the AI suggests", "Try the budget planner", "Approve: citizens get a message"]} actions={<button className="btn" onClick={regenerate} disabled={regen}><RefreshCw size={16} aria-hidden="true" />{regen ? 'Updating…' : 'Refresh suggestions'}</button>}>
         What to build first, how much it costs, and why.
       </PageHead>
       <Tabs value={tab} onChange={change} tabs={[

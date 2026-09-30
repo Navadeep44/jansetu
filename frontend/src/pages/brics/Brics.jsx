@@ -21,7 +21,7 @@ export default function Brics() {
     .filter((r) => r.value !== null), [data, metric, sector])
   return (
     <div className="stack-md">
-      <PageHead title="BRICS comparison">Each country keeps its own data. Only totals are shared, never personal details.</PageHead>
+      <PageHead title="BRICS comparison" eyebrow="Open to everyone" steps={["Each country keeps its own data", "Only totals are shared", "Compare needs side by side"]}>Each country keeps its own data. Only totals are shared, never personal details.</PageHead>
       <div className="grid g-3">
         <Card><div className="row"><span className="icon-tile"><Server size={20} aria-hidden="true" /></span><div><strong>Sovereign nodes</strong><div className="small muted">Data stays in-country: satisfies India DPDP, Brazil LGPD, SA POPIA, Russia 152-FZ, China PIPL.</div></div></div></Card>
         <Card><div className="row"><span className="icon-tile"><Lock size={20} aria-hidden="true" /></span><div><strong>Privacy-safe exchange</strong><div className="small muted">k-anonymity (cells under 5 households suppressed) and optional differential-privacy noise.</div></div></div></Card>

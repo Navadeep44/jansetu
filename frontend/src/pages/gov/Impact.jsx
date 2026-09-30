@@ -14,7 +14,7 @@ export default function Impact() {
   const langs = d ? Object.entries(d.language_mix).map(([l, v]) => ({ name: LANG_NAMES[l] || l, value: v })) : []
   return (
     <div className="stack-md">
-      <PageHead title="Results & impact">Did the work solve the problem? And is everyone being heard?</PageHead>
+      <PageHead title="Results & impact" eyebrow="Official workspace" overlap={false} steps={["See finished work", "Compare before and after", "Check who is not being heard"]}>Did the work solve the problem? And is everyone being heard?</PageHead>
       <h2>Completed projects</h2>
       {imp.loading ? <Loading height={300} /> : (
         <div className="grid g-2">

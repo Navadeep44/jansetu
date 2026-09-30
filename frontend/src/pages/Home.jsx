@@ -6,7 +6,7 @@ import {
 import { api } from '../api/client'
 import { useApp } from '../context/AppContext'
 import { useAsync } from '../lib/useAsync'
-import { ColorGuide } from '../components/ui'
+import { ColorGuide, PageHead } from '../components/ui'
 import { fmt } from '../lib/format'
 
 const WHAT = [
@@ -67,15 +67,14 @@ export default function Home() {
   const { data: b } = useAsync(() => api.board(), [])
   return (
     <div className="stack-lg">
-      <section className="hero">
-        <h1>Your voice → better roads, water and schools.</h1>
-        <p className="lead">Tell the government what your area needs, in your own language. JanSetu makes sure it reaches the right people, and shows what they did.</p>
-        <div className="row mt-lg">
+      <PageHead title="Your voice → better roads, water and schools." eyebrow="Quick guide · 2 minutes"
+        steps={['Report in your language', 'Officials see the real needs', 'You confirm the fix']}
+        actions={<>
           <Link to="/report" className="btn btn-primary btn-lg"><Megaphone size={20} aria-hidden="true" />Report a problem</Link>
-          <Link to={isOfficial ? '/dashboard' : '/login'} className="btn btn-lg btn-hero-ghost"><LogIn size={20} aria-hidden="true" />I am an official</Link>
-        </div>
-        <p className="small" style={{ color: '#94a3b8', marginTop: 12 }}>No login needed for citizens · Works in 6+ languages · Free and open source</p>
-      </section>
+          <Link to={isOfficial ? '/dashboard' : '/login?as=official'} className="btn btn-lg"><LogIn size={20} aria-hidden="true" />I am an official</Link>
+        </>}>
+        Tell the government what your area needs, in your own language. JanSetu makes sure it reaches the right people, and shows what they did.
+      </PageHead>
 
       <section className="grid g-4" aria-label="Live numbers">
         <div className="card stat tile-blue"><span className="stat-label"><MessageCircle size={16} aria-hidden="true" />Reports received</span><span className="stat-value">{fmt(b?.requests)}</span></div>

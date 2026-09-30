@@ -16,7 +16,7 @@ export default function Results() {
   const { data, loading } = useAsync(() => api.board(country), [country])
   return (
     <div className="stack-md">
-      <PageHead title="Public results: you said, we did" actions={
+      <PageHead title="Public results: you said, we did" eyebrow="Open to everyone" steps={["See what people asked for", "See what was done", "Only citizens can confirm a fix"]} actions={
         <Seg label="Country" value={country} onChange={setCountry} options={[{ value: 'all', label: 'All' }, { value: 'IN', label: 'India' }, { value: 'BR', label: 'Brazil' }, { value: 'ZA', label: 'South Africa' }]} />}>
         What people asked for, and what the government did. Open to everyone.
       </PageHead>

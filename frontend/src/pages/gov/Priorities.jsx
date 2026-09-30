@@ -28,7 +28,7 @@ export default function Priorities() {
 
   return (
     <div className="stack-md">
-      <PageHead title="Priority ranking" actions={<a className="btn btn-sm" href={api.exportUrl(countryParam)} download><Download size={16} aria-hidden="true" />Download CSV</a>}>Which places need help most. Move the sliders to change what matters.</PageHead>
+      <PageHead title="Priority ranking" eyebrow="Official workspace" steps={["Top rows need help most", "Move sliders to change what matters", "Download the list"]} actions={<a className="btn btn-sm" href={api.exportUrl(countryParam)} download><Download size={16} aria-hidden="true" />Download CSV</a>}>Which places need help most. Move the sliders to change what matters.</PageHead>
       <Tabs value={tab} onChange={setTab} tabs={[{ value: 'ngi', label: 'Ranking' }, { value: 'silent', label: `Silent areas (${silent.data?.length ?? '…'})` }]} />
       {tab === 'ngi' ? (
         <div className="grid g-main" style={{ gridTemplateColumns: 'minmax(0, 2fr) minmax(280px, 1fr)' }}>

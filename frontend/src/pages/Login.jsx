@@ -4,7 +4,7 @@ import { AnimatePresence, motion } from 'framer-motion'
 import { Building2, Info, KeyRound, LogIn, Megaphone, Phone, ShieldCheck, UserRound } from 'lucide-react'
 import { api } from '../api/client'
 import { useApp } from '../context/AppContext'
-import { Card, ErrorBox } from '../components/ui'
+import { Card, ErrorBox, PageHead } from '../components/ui'
 
 const WHAT = {
   field_officer: 'Checks unclear reports, closes work with proof',
@@ -128,7 +128,10 @@ export default function Login() {
   useEffect(() => { if (isCitizen && as === 'citizen') nav(next || '/track', { replace: true }) }, [isCitizen, as, nav, next])
 
   return (
-    <div className="stack-md" style={{ maxWidth: 1000, margin: '0 auto', width: '100%' }}>
+    <div className="stack-md narrow">
+      <PageHead title={as === 'official' ? 'Official login' : 'Citizen login'} eyebrow={as === 'official' ? 'For government staff' : 'Optional for citizens'}>
+        {as === 'official' ? 'Log in to see the inbox, dashboard, priorities and projects.' : 'You never need to log in to report. Log in only to see all your requests in one place.'}
+      </PageHead>
       <div className="login-switch" role="tablist" aria-label="Who are you?">
         {[{ v: 'citizen', label: 'I am a citizen', Icon: UserRound }, { v: 'official', label: 'I am an official', Icon: Building2 }].map(({ v, label, Icon }) => (
           <button key={v} role="tab" aria-selected={as === v} className={`login-tab ${as === v ? 'active' : ''}`}

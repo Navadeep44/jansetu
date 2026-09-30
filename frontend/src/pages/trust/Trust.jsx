@@ -21,7 +21,7 @@ export function Audit() {
   const { data, loading } = useAsync(() => api.auditLog(), [])
   return (
     <div className="stack-md">
-      <PageHead title="Decision log">Every decision by an official, with who and why.</PageHead>
+      <PageHead title="Decision log" eyebrow="Official workspace">Every decision by an official, with who and why.</PageHead>
       <Card>
         {loading ? <Loading /> : (
           <div className="table-wrap"><table className="table">
@@ -41,7 +41,7 @@ export default function Trust() {
   const cap = meta?.capabilities || {}
   return (
     <div className="stack-md">
-      <PageHead title="Privacy & open standards">How we keep data safe, and why any country can use JanSetu for free.</PageHead>
+      <PageHead title="Privacy & open standards" eyebrow="Open to everyone">How we keep data safe, and why any country can use JanSetu for free.</PageHead>
       <div className="grid g-main">
         <Card title="DPG standard: 9 indicators">
           <div className="stack">

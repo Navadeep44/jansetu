@@ -35,7 +35,7 @@ export default function Channels() {
 
   return (
     <div className="stack-md">
-      <PageHead title="WhatsApp & phone demo">
+      <PageHead title="WhatsApp & phone demo" eyebrow="For citizens · no login needed" overlap={false} steps={["Pick WhatsApp, Telegram or SMS", "Type like a citizen would", "See the reply and tracking ID"]}>
         Chat exactly like a citizen would. Real WhatsApp, Telegram, phone calls and SMS use the same engine.
       </PageHead>
       <div className="grid g-main" style={{ alignItems: 'start' }}>

@@ -42,9 +42,11 @@ export default function DemandMap({ areas = [], layer = 'ngi', region = 'all', s
     <div className={`map-box ${tall ? 'tall' : ''}`}>
       <MapContainer center={r0.center} zoom={r0.zoom} scrollWheelZoom style={{ height: '100%', width: '100%' }} worldCopyJump>
         <TileLayer
-          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/">CARTO</a>'
-          url="https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png"
+          attribution='Tiles &copy; <a href="https://www.esri.com/">Esri</a> · HERE, Garmin, &copy; OpenStreetMap contributors'
+          url="https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Light_Gray_Base/MapServer/tile/{z}/{y}/{x}"
+          maxZoom={16}
         />
+        <TileLayer url="https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Light_Gray_Reference/MapServer/tile/{z}/{y}/{x}" maxZoom={16} />
         <FlyTo region={region} fitPoints={fit ? areas : null} />
         {areas.map((a, i) => {
           const ngi = sector && sector !== 'all' ? a.sectors?.[sector]?.ngi ?? a.ngi_max : a.ngi_max

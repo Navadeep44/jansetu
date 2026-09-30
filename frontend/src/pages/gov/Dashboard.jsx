@@ -28,7 +28,7 @@ export default function Dashboard() {
 
   return (
     <div className="stack-md">
-      <PageHead title="Dashboard"
+      <PageHead title="Dashboard" eyebrow="Official workspace" steps={["Pick a map view", "Click a circle to see that area", "Check warnings and money on the right"]}
         actions={<Link to="/ask" className="btn btn-primary">Ask a question</Link>}>
         Where people need what, and where nobody is listening.
       </PageHead>

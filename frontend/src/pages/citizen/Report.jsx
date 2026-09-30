@@ -6,7 +6,7 @@ import { useApp } from '../../context/AppContext'
 import { tr } from '../../i18n/strings'
 import VoiceInput, { SpeakButton } from '../../components/citizen/VoiceInput'
 import ReplyBox from '../../components/citizen/ReplyBox'
-import { Badge, Card, ErrorBox, SectorTag, Tabs } from '../../components/ui'
+import { Badge, Card, ErrorBox, PageHead, SectorTag, Tabs } from '../../components/ui'
 import { LANG_NAMES, pct } from '../../lib/format'
 
 const SPEAK_LANGS = ['te', 'hi', 'or', 'bn', 'ta', 'en', 'pt', 'zu', 'xh', 'af', 'ru', 'zh', 'ar']
@@ -136,7 +136,8 @@ export default function Report() {
   if (result) {
     const r = result
     return (
-      <div className="stack-md" style={{ maxWidth: 820 }}>
+      <div className="stack-md narrow">
+        <PageHead title="We got your request" eyebrow="For citizens · no login needed" icon={CheckCircle2} overlap={false}>Keep your tracking ID. We will tell you every time something changes.</PageHead>
         <div className={`alert ${r.reply_kind === 'safety' ? 'alert-danger' : r.reply_kind === 'ask_location' || r.reply_kind === 'clarify' ? 'alert-warn' : 'alert-success'}`} role="status">
           {r.reply_kind === 'safety' ? <ShieldAlert size={22} aria-hidden="true" /> : <CheckCircle2 size={22} aria-hidden="true" />}
           <div className="stack" style={{ gap: 6 }}>
@@ -175,11 +176,8 @@ export default function Report() {
   }
 
   return (
-    <div className="stack-md" style={{ maxWidth: 1100 }}>
-      <header>
-        <h1>{L('title')}</h1>
-        <p className="muted">{L('subtitle')}</p>
-      </header>
+    <div className="stack-md">
+      <PageHead title={L('title')} eyebrow="For citizens · no login needed" steps={['Speak or type the problem', 'Choose your place', 'Get a tracking ID']}>{L('subtitle')}</PageHead>
       <Tabs value={tab} onChange={setTab} tabs={[{ value: 'individual', label: L('individual') }, { value: 'community', label: L('community') }]} />
       <ErrorBox error={error} />
       {offlineMsg && <div className="alert alert-info" role="status"><CloudOff size={18} aria-hidden="true" /><div>{offlineMsg}</div></div>}

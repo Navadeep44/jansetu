@@ -14,8 +14,8 @@ export function ClusterList() {
   const { data, loading, error } = useAsync(() => api.clusters({ country: countryParam, category: sector, sort, limit: 60 }), [countryParam, sector, sort])
   return (
     <div className="stack-md">
-      <PageHead title="Grouped needs">Same problem, same place = one need. We count families, not messages.</PageHead>
-      <div className="row">
+      <PageHead title="Grouped needs" eyebrow="Official workspace" steps={["One card = one problem in one place", "Sort by families, severity or date", "Open a card to read what people said"]}>Same problem, same place = one need. We count families, not messages.</PageHead>
+      <div className="card row">
         <label className="row small"><span className="muted">Sector</span>
           <select className="select" style={{ width: 'auto' }} value={sector} onChange={(e) => setSector(e.target.value)}>
             <option value="all">All</option>{SECTOR_KEYS.map((s) => <option key={s} value={s}>{SECTORS[s].label}</option>)}</select></label>
@@ -54,7 +54,7 @@ export function ClusterDetail() {
   const c = data.cluster
   return (
     <div className="stack-md">
-      <PageHead title={c.title} actions={<Link to="/clusters" className="btn btn-sm">All grouped needs</Link>}>{c.summary}</PageHead>
+      <PageHead title={c.title} eyebrow="Official workspace" actions={<Link to="/clusters" className="btn btn-sm">All grouped needs</Link>}>{c.summary}</PageHead>
       <div className="grid g-4">
         <div className="card stat"><span className="stat-label">Unique households</span><span className="stat-value">{fmt(c.unique_households)}</span></div>
         <div className="card stat"><span className="stat-label">Reports</span><span className="stat-value">{fmt(c.request_count)}</span></div>
